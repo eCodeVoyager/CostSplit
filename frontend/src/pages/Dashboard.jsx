@@ -60,18 +60,16 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div className="min-h-screen gradient-bg pb-6">
+    <div className="min-h-screen bg-background pb-6">
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-7xl">
-        {/* Mobile-Optimized Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-8 fade-in">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center ring-2 ring-primary/20">
-              <Wallet className="w-5 h-5 text-primary" />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                CostSplit
-              </h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">CostSplit</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Shared Expense Manager</p>
             </div>
           </div>
@@ -79,19 +77,19 @@ export default function Dashboard() {
             variant="outline"
             onClick={handleLogout}
             size="sm"
-            className="h-9 soft-button hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20"
+            className="soft-button"
           >
             <LogOut className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
 
-        {/* Mobile-Optimized Quick Actions */}
-        <div className="grid grid-cols-3 gap-2 mb-4 sm:flex sm:gap-3 sm:mb-6 fade-in" style={{ animationDelay: '0.1s' }}>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:gap-3">
           <Button
             onClick={() => navigate('/expenses')}
             size="sm"
-            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button bg-gradient-to-br from-primary to-primary/90"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button"
           >
             <Plus className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Add Expense</span>
@@ -100,7 +98,7 @@ export default function Dashboard() {
             onClick={() => navigate('/members')}
             variant="outline"
             size="sm"
-            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button hover:bg-primary/5 hover:border-primary/30"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button"
           >
             <Users className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Add Member</span>
@@ -109,82 +107,74 @@ export default function Dashboard() {
             onClick={() => navigate('/balances')}
             variant="outline"
             size="sm"
-            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button hover:bg-primary/5 hover:border-primary/30"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button"
           >
             <Scale className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Balances</span>
           </Button>
         </div>
 
-        {/* Mobile-Optimized Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-8 fade-in" style={{ animationDelay: '0.2s' }}>
-          <Card className="smooth-card border-l-4 border-l-blue-400/50 hover:border-l-blue-500">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <Card className="smooth-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Members</CardTitle>
-              <div className="p-1.5 bg-blue-50 rounded-lg">
-                <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-              </div>
+              <CardTitle className="text-xs sm:text-sm font-medium">Members</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.totalMembers}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalMembers}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Active members</p>
             </CardContent>
           </Card>
 
-          <Card className="smooth-card border-l-4 border-l-emerald-400/50 hover:border-l-emerald-500">
+          <Card className="smooth-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Expenses</CardTitle>
-              <div className="p-1.5 bg-emerald-50 rounded-lg">
-                <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-              </div>
+              <CardTitle className="text-xs sm:text-sm font-medium">Expenses</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-emerald-600">{stats.totalExpenses}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalExpenses}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="smooth-card border-l-4 border-l-violet-400/50 hover:border-l-violet-500">
+          <Card className="smooth-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Total</CardTitle>
-              <div className="p-1.5 bg-violet-50 rounded-lg">
-                <Scale className="h-3 w-3 sm:h-4 sm:w-4 text-violet-600" />
-              </div>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
+              <Scale className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-lg sm:text-2xl font-bold text-violet-600">{formatCurrency(stats.totalAmount)}</div>
+              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Total spending</p>
             </CardContent>
           </Card>
 
-          <Card className="smooth-card border-l-4 border-l-amber-400/50 hover:border-l-amber-500">
+          <Card className="smooth-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Average</CardTitle>
-              <div className="p-1.5 bg-amber-50 rounded-lg">
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
-              </div>
+              <CardTitle className="text-xs sm:text-sm font-medium">Average</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-lg sm:text-2xl font-bold text-amber-600">{formatCurrency(averageExpense)}</div>
+              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(averageExpense)}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Per transaction</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-8">
-          {/* Recent Expenses - Full Width on Mobile */}
-          <Card className="shadow-sm">
+        <div className="grid grid-cols-1 gap-4 mb-6">
+          {/* Recent Expenses */}
+          <Card className="smooth-card">
             <CardHeader className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                    <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Clock className="w-5 h-5" />
                     Recent
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">Last 5 transactions</CardDescription>
                 </div>
                 <Link to="/expenses">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs sm:text-sm">View All</Button>
+                  <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </div>
             </CardHeader>
@@ -199,21 +189,21 @@ export default function Dashboard() {
                     variant="link"
                     size="sm"
                     onClick={() => navigate('/expenses')}
-                    className="mt-2 text-xs"
+                    className="mt-2"
                   >
                     Add your first expense
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-2 sm:space-y-3">
+                <div className="space-y-2">
                   {recentExpenses.map((expense) => (
                     <div
                       key={expense._id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors active:bg-slate-200"
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted"
                     >
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 bg-green-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Receipt className="w-4 h-4 text-green-700" />
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Receipt className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate text-sm sm:text-base">{expense.title}</p>
@@ -222,7 +212,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm sm:text-base font-bold text-green-600 ml-2 flex-shrink-0">
+                      <span className="text-sm sm:text-base font-bold ml-2 flex-shrink-0">
                         {formatCurrency(expense.amount)}
                       </span>
                     </div>
@@ -232,19 +222,19 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Members - Full Width on Mobile, shows under recent expenses */}
-          <Card className="shadow-sm">
+          {/* Members */}
+          <Card className="smooth-card">
             <CardHeader className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Users className="w-5 h-5" />
                     Members
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">Group members</CardDescription>
                 </div>
                 <Link to="/members">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs sm:text-sm">Manage</Button>
+                  <Button variant="ghost" size="sm">Manage</Button>
                 </Link>
               </div>
             </CardHeader>
@@ -259,7 +249,7 @@ export default function Dashboard() {
                     variant="link"
                     size="sm"
                     onClick={() => navigate('/members')}
-                    className="mt-2 text-xs"
+                    className="mt-2"
                   >
                     Add members
                   </Button>
@@ -269,10 +259,10 @@ export default function Dashboard() {
                   {members.map((member) => (
                     <div
                       key={member._id}
-                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors active:bg-slate-100"
+                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50"
                     >
-                      <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-blue-700">
+                      <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold">
                           {member.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -285,7 +275,6 @@ export default function Dashboard() {
                         variant="link"
                         size="sm"
                         onClick={() => navigate('/members')}
-                        className="text-xs"
                       >
                         +{stats.totalMembers - 5} more
                       </Button>
@@ -297,14 +286,14 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Mobile-Optimized Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
-          <Link to="/members" className="block">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]">
+        {/* Navigation Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link to="/members">
+            <Card className="smooth-card cursor-pointer">
               <CardHeader className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Users className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <CardTitle className="text-base sm:text-lg">Members</CardTitle>
@@ -315,12 +304,12 @@ export default function Dashboard() {
             </Card>
           </Link>
 
-          <Link to="/expenses" className="block">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]">
+          <Link to="/expenses">
+            <Card className="smooth-card cursor-pointer">
               <CardHeader className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                  <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Receipt className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <CardTitle className="text-base sm:text-lg">Expenses</CardTitle>
@@ -331,12 +320,12 @@ export default function Dashboard() {
             </Card>
           </Link>
 
-          <Link to="/balances" className="block">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]">
+          <Link to="/balances">
+            <Card className="smooth-card cursor-pointer">
               <CardHeader className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                  <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Scale className="w-6 h-6" />
                   </div>
                   <div className="min-w-0">
                     <CardTitle className="text-base sm:text-lg">Balances</CardTitle>

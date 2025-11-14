@@ -75,31 +75,31 @@ export default function Members() {
   };
 
   return (
-    <div className="min-h-screen gradient-bg pb-6">
+    <div className="min-h-screen bg-background pb-6">
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
-        {/* Mobile-Optimized Header */}
-        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 fade-in">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 soft-button">
+            <Button variant="outline" size="icon" className="soft-button">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-blue-200">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+              <Users className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">Members</h1>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Members</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage group members</p>
             </div>
           </div>
         </div>
 
-        {/* Mobile-Optimized Add Member Form */}
-        <Card className="mb-4 sm:mb-6 smooth-card fade-in" style={{ animationDelay: '0.1s' }}>
+        {/* Add Member Form */}
+        <Card className="mb-6 smooth-card">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              <UserPlus className="w-5 h-5" />
               Add New Member
             </CardTitle>
           </CardHeader>
@@ -121,7 +121,7 @@ export default function Members() {
               <Button
                 type="submit"
                 disabled={isLoading || !newMemberName.trim()}
-                className="h-11 sm:h-10 soft-button bg-gradient-to-br from-primary to-primary/90"
+                className="h-11 sm:h-10 soft-button"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 <span className="text-base sm:text-sm">Add Member</span>
@@ -130,8 +130,8 @@ export default function Members() {
           </CardContent>
         </Card>
 
-        {/* Mobile-Optimized Members List */}
-        <Card className="smooth-card fade-in" style={{ animationDelay: '0.2s' }}>
+        {/* Members List */}
+        <Card className="smooth-card">
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">Group Members ({members.length})</CardTitle>
           </CardHeader>
@@ -146,11 +146,11 @@ export default function Members() {
                 {members.map((member) => (
                   <div
                     key={member._id}
-                    className="flex items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 active:bg-secondary/60 transition-all active:scale-[0.99]"
+                    className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-lg hover:bg-muted"
                   >
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-blue-200">
-                        <span className="text-sm sm:text-base text-blue-700 font-semibold">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold">
                           {member.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -160,9 +160,9 @@ export default function Members() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteMember(member._id, member.name)}
-                      className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 ml-2 hover:bg-red-50 hover:text-red-600"
+                      className="soft-button"
                     >
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
                 ))}

@@ -39,14 +39,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center gradient-bg p-3 sm:p-4">
-      <Card className="w-full max-w-md smooth-card shadow-lg fade-in">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4">
+      <Card className="w-full max-w-md smooth-card shadow-lg">
         <CardHeader className="space-y-4 text-center pb-6">
-          <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center ring-2 ring-primary/20">
-            <Wallet className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+          <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+            <Wallet className="w-8 h-8 text-foreground" />
           </div>
           <div>
-            <CardTitle className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">CostSplit</CardTitle>
+            <CardTitle className="text-3xl sm:text-4xl font-bold">CostSplit</CardTitle>
             <CardDescription className="mt-2 text-base">Shared Expense Manager</CardDescription>
           </div>
         </CardHeader>
@@ -78,11 +78,11 @@ export default function Login() {
                 className="h-12 text-base"
               />
             </div>
-            <Button type="submit" className="w-full h-12 text-base font-semibold soft-button bg-gradient-to-br from-primary to-primary/90" disabled={isLoading}>
+            <Button type="submit" className="w-full h-12 text-base font-semibold soft-button" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
-          <div className="mt-6 text-center text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-border/30">
+          <div className="mt-6 text-center text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg border">
             <p className="font-medium">Default credentials:</p>
             <p className="font-mono text-base mt-1">admin / 1234</p>
           </div>

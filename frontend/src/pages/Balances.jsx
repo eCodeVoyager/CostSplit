@@ -134,21 +134,21 @@ export default function Balances() {
   };
 
   return (
-    <div className="min-h-screen gradient-bg pb-6">
+    <div className="min-h-screen bg-background pb-6">
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
-        {/* Mobile-Optimized Header */}
-        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 fade-in">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 soft-button">
+            <Button variant="outline" size="icon" className="soft-button">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-violet-50 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-violet-200">
-              <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+              <Scale className="w-5 h-5" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">Balances</h1>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Balances</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">View balances and settlements</p>
             </div>
           </div>
@@ -159,9 +159,9 @@ export default function Balances() {
             <p className="text-sm sm:text-base text-muted-foreground">Loading balances...</p>
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {/* Mobile-Optimized Member Balances */}
-            <Card className="smooth-card fade-in" style={{ animationDelay: '0.1s' }}>
+          <div className="space-y-6">
+            {/* Member Balances */}
+            <Card className="smooth-card">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg sm:text-xl">Member Balances</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
@@ -179,7 +179,7 @@ export default function Balances() {
                     {balances.map((balance) => (
                       <div
                         key={balance.memberId}
-                        className="flex items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 active:bg-secondary/60 transition-all"
+                        className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-lg hover:bg-muted"
                       >
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                           <div
@@ -207,8 +207,8 @@ export default function Balances() {
               </CardContent>
             </Card>
 
-            {/* Mobile-Optimized Settlement Instructions */}
-            <Card className="smooth-card fade-in" style={{ animationDelay: '0.2s' }}>
+            {/* Settlement Instructions */}
+            <Card className="smooth-card">
               <CardHeader className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
@@ -253,7 +253,7 @@ export default function Balances() {
                     {settlements.map((settlement, index) => (
                       <div
                         key={index}
-                        className="flex flex-col gap-3 p-3 sm:p-4 bg-gradient-to-r from-orange-50/80 to-amber-50/80 rounded-lg border border-orange-200/50 hover:border-orange-300/60 transition-all"
+                        className="flex flex-col gap-3 p-3 sm:p-4 bg-muted/30 rounded-lg border hover:bg-muted/50"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
@@ -284,7 +284,7 @@ export default function Balances() {
                         <Button
                           onClick={() => handleMarkAsPaid(settlement)}
                           size="sm"
-                          className="w-full sm:w-auto h-9 soft-button bg-gradient-to-br from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+                          className="w-full sm:w-auto h-9 soft-button"
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
                           <span className="text-xs sm:text-sm">Mark as Paid</span>
@@ -296,13 +296,13 @@ export default function Balances() {
               </CardContent>
             </Card>
 
-            {/* Mobile-Optimized Summary */}
+            {/* How to Settle */}
             {settlements.length > 0 && (
-              <Card className="smooth-card bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 fade-in" style={{ animationDelay: '0.3s' }}>
+              <Card className="smooth-card bg-muted/30">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-primary text-lg sm:text-xl">How to Settle</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl">How to Settle</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 text-xs sm:text-sm text-foreground/80">
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 text-xs sm:text-sm">
                   <ol className="list-decimal list-inside space-y-2">
                     <li>Each person listed on the left should pay the person on the right</li>
                     <li>Once all transactions are completed, everyone's balance will be zero</li>
@@ -314,7 +314,7 @@ export default function Balances() {
 
             {/* Settlement History */}
             {completedSettlements.length > 0 && (
-              <Card className="smooth-card fade-in" style={{ animationDelay: '0.4s' }}>
+              <Card className="smooth-card">
                 <CardHeader className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-2">
