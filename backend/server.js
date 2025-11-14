@@ -122,30 +122,34 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-});
+// Start server only if not in test mode or if explicitly required
+let server;
 
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  server.close(() => process.exit(1));
-});
-
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    console.log(`
 ╔═══════════════════════════════════════╗
 ║   CostSplit API Server                ║
 ║   Environment: ${NODE_ENV.padEnd(23)}║
 ║   Port: ${PORT.toString().padEnd(30)}║
 ║   Status: Running                     ║
 ╚═══════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
+    server.close(() => process.exit(1));
+  });
+}
 
 module.exports = { app, server };

@@ -1,12 +1,20 @@
-// Test setup file
-require('dotenv').config({ path: '.env.example' });
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
-// Set test environment variables
-process.env.NODE_ENV = 'test';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/costsplit_test';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret';
-process.env.SHARED_USERNAME = process.env.SHARED_USERNAME || 'admin';
-process.env.SHARED_PASSWORD = process.env.SHARED_PASSWORD || '1234';
+let mongoServer;
 
-// Increase timeout for tests
-jest.setTimeout(10000);
+// Start MongoDB Memory Server before all tests
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+  
+  // Set the MongoDB URI for tests
+  process.env.MONGODB_URI = mongoUri;
+  process.env.NODE_ENV = 'test';
+}, 60000);
+
+// Stop MongoDB Memory Server after all tests
+afterAll(async () => {
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
+}, 30000);
