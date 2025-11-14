@@ -5,12 +5,13 @@ import { formatCurrency } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Scale, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Scale, TrendingUp, TrendingDown, ArrowRight, Copy, Check } from 'lucide-react';
 
 export default function Balances() {
   const [balances, setBalances] = useState([]);
   const [settlements, setSettlements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -50,6 +51,40 @@ export default function Balances() {
     if (balance > 0) return 'bg-green-100';
     if (balance < 0) return 'bg-red-100';
     return 'bg-slate-100';
+  };
+
+  const handleCopySettlements = () => {
+    if (settlements.length === 0) {
+      toast({
+        title: 'No settlements',
+        description: 'All balances are settled',
+      });
+      return;
+    }
+
+    const text = settlements
+      .map((s, i) => `${i + 1}. ${s.from} pays ${s.to}: ${formatCurrency(s.amount)}`)
+      .join('\n');
+
+    const fullText = `CostSplit Settlements:\n\n${text}\n\nTotal: ${settlements.length} transaction(s)`;
+
+    navigator.clipboard.writeText(fullText).then(
+      () => {
+        setCopied(true);
+        toast({
+          title: 'Copied!',
+          description: 'Settlement instructions copied to clipboard',
+        });
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => {
+        toast({
+          title: 'Error',
+          description: 'Failed to copy to clipboard',
+          variant: 'destructive',
+        });
+      }
+    );
   };
 
   return (
@@ -129,10 +164,29 @@ export default function Balances() {
             {/* Settlement Instructions */}
             <Card>
               <CardHeader>
-                <CardTitle>Settlement Instructions</CardTitle>
-                <CardDescription>
-                  Follow these transactions to settle all balances
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Settlement Instructions</CardTitle>
+                    <CardDescription>
+                      Follow these transactions to settle all balances
+                    </CardDescription>
+                  </div>
+                  {settlements.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleCopySettlements}>
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {settlements.length === 0 ? (

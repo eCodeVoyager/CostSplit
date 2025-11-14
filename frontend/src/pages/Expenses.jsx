@@ -8,12 +8,14 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Plus, Receipt, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter } from 'lucide-react';
 
 export default function Expenses() {
   const [members, setMembers] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -105,6 +107,94 @@ export default function Expenses() {
       });
     }
   };
+
+  // Filter expenses based on search and date filter
+  const getFilteredExpenses = () => {
+    let filtered = [...expenses];
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter((expense) =>
+        expense.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        expense.paidBy?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      filtered = filtered.filter((expense) => {
+        const expenseDate = new Date(expense.date);
+
+        switch (dateFilter) {
+          case 'today':
+            return expenseDate >= today;
+          case 'week': {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return expenseDate >= weekAgo;
+          }
+          case 'month': {
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            return expenseDate >= monthAgo;
+          }
+          default:
+            return true;
+        }
+      });
+    }
+
+    return filtered;
+  };
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const filtered = getFilteredExpenses();
+
+    if (filtered.length === 0) {
+      toast({
+        title: 'No data',
+        description: 'No expenses to export',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['Date', 'Title', 'Amount', 'Paid By'];
+    const rows = filtered.map((expense) => [
+      formatDate(expense.date),
+      expense.title,
+      expense.amount,
+      expense.paidBy?.name || 'Unknown',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `costsplit-expenses-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: 'Success',
+      description: 'Expenses exported successfully',
+    });
+  };
+
+  const filteredExpenses = getFilteredExpenses();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -204,20 +294,90 @@ export default function Expenses() {
           </CardContent>
         </Card>
 
+        {/* Search and Filter */}
+        {expenses.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      placeholder="Search by title or member..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="w-[150px]">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={handleExportCSV}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+              {(searchQuery || dateFilter !== 'all') && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Showing {filteredExpenses.length} of {expenses.length} expenses</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setDateFilter('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Expenses List */}
         <Card>
           <CardHeader>
-            <CardTitle>Expense History ({expenses.length})</CardTitle>
+            <CardTitle>Expense History ({filteredExpenses.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            {expenses.length === 0 ? (
+            {filteredExpenses.length === 0 && expenses.length > 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No expenses match your filters</p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDateFilter('all');
+                  }}
+                  className="mt-2"
+                >
+                  Clear filters
+                </Button>
+              </div>
+            ) : expenses.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No expenses yet. Add your first expense above!</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {expenses.map((expense) => (
+                {filteredExpenses.map((expense) => (
                   <div
                     key={expense._id}
                     className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
