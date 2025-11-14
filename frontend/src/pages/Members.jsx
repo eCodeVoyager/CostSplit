@@ -80,7 +80,7 @@ export default function Members() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="soft-button">
+            <Button variant="outline" size="icon" className="soft-button" aria-label="Go back to dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
@@ -161,6 +161,7 @@ export default function Members() {
                       size="icon"
                       onClick={() => handleDeleteMember(member._id, member.name)}
                       className="soft-button"
+                      aria-label={`Delete ${member.name}`}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>

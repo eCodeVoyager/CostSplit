@@ -78,6 +78,7 @@ export default function Dashboard() {
             onClick={handleLogout}
             size="sm"
             className="soft-button"
+            aria-label="Logout"
           >
             <LogOut className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Logout</span>
@@ -174,7 +175,7 @@ export default function Dashboard() {
                   <CardDescription className="text-xs sm:text-sm">Last 5 transactions</CardDescription>
                 </div>
                 <Link to="/expenses">
-                  <Button variant="ghost" size="sm">View All</Button>
+                  <Button variant="ghost" size="sm" className="h-11 sm:h-10">View All</Button>
                 </Link>
               </div>
             </CardHeader>
@@ -208,7 +209,13 @@ export default function Dashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate text-sm sm:text-base">{expense.title}</p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {expense.paidBy?.name || 'Unknown'} • {formatDate(expense.date)}
+                            {expense.payers && expense.payers.length > 0 ? (
+                              // Split payment
+                              <>Split: {expense.payers.map(p => p.member.name).join(', ')} • {formatDate(expense.date)}</>
+                            ) : (
+                              // Single payment
+                              <>{expense.paidBy?.name || 'Unknown'} • {formatDate(expense.date)}</>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -234,7 +241,7 @@ export default function Dashboard() {
                   <CardDescription className="text-xs sm:text-sm">Group members</CardDescription>
                 </div>
                 <Link to="/members">
-                  <Button variant="ghost" size="sm">Manage</Button>
+                  <Button variant="ghost" size="sm" className="h-11 sm:h-10">Manage</Button>
                 </Link>
               </div>
             </CardHeader>

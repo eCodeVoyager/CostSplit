@@ -105,11 +105,11 @@ export default function Expenses() {
         return;
       }
 
-      const selectedPayers = splitPayers.filter(p => p.selected && p.amount > 0);
+      const selectedPayers = splitPayers.filter(p => p.selected && parseFloat(p.amount || 0) > 0);
       if (selectedPayers.length === 0) {
         toast({
           title: 'Error',
-          description: 'Please select at least one payer with amount',
+          description: 'Please select at least one payer with a valid amount',
           variant: 'destructive',
         });
         return;
@@ -117,6 +117,17 @@ export default function Expenses() {
 
       const totalPaid = selectedPayers.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
       const totalAmount = parseFloat(formData.amount);
+
+      // Check for negative amounts
+      const hasNegativeAmount = selectedPayers.some(p => parseFloat(p.amount) < 0);
+      if (hasNegativeAmount) {
+        toast({
+          title: 'Error',
+          description: 'Amount cannot be negative',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       if (Math.abs(totalPaid - totalAmount) > 0.01) {
         toast({
@@ -131,18 +142,17 @@ export default function Expenses() {
     setIsLoading(true);
     try {
       if (isSplitPayment) {
-        // Create multiple expenses for split payment
-        const selectedPayers = splitPayers.filter(p => p.selected && p.amount > 0);
-        await Promise.all(
-          selectedPayers.map(payer =>
-            expensesAPI.create({
-              title: `${formData.title} (Split - ${payer.name})`,
-              amount: payer.amount,
-              paidBy: payer.id,
-              date: formData.date,
-            })
-          )
-        );
+        // Create single expense with multiple payers using backend's payers array
+        const selectedPayers = splitPayers.filter(p => p.selected && parseFloat(p.amount) > 0);
+        await expensesAPI.create({
+          title: formData.title,
+          amount: parseFloat(formData.amount),
+          payers: selectedPayers.map(payer => ({
+            member: payer.id,
+            amount: parseFloat(payer.amount),
+          })),
+          date: formData.date,
+        });
       } else {
         // Single payment
         await expensesAPI.create(formData);
@@ -193,15 +203,25 @@ export default function Expenses() {
     setIsSplitPayment(newSplitMode);
 
     if (newSplitMode) {
+      // Check if members exist
+      if (members.length === 0) {
+        toast({
+          title: 'No members',
+          description: 'Please add members before using split payment',
+          variant: 'destructive',
+        });
+        setIsSplitPayment(false);
+        return;
+      }
+
       // Initialize split payers when enabling split mode
-      const totalAmount = parseFloat(formData.amount) || 0;
-      const perPerson = members.length > 0 ? (totalAmount / members.length).toFixed(2) : '0';
+      // Don't pre-fill amounts until user enters total amount
       setSplitPayers(
         members.map(member => ({
           id: member._id,
           name: member.name,
           selected: false,
-          amount: perPerson,
+          amount: '0',
         }))
       );
     } else {
@@ -218,6 +238,12 @@ export default function Expenses() {
   };
 
   const handleSplitAmountChange = (payerId, amount) => {
+    // Store as string to preserve decimal input, but validate it's a valid number
+    const numAmount = parseFloat(amount);
+    if (amount !== '' && (isNaN(numAmount) || numAmount < 0)) {
+      return; // Ignore invalid input
+    }
+
     setSplitPayers(prev =>
       prev.map(payer =>
         payer.id === payerId ? { ...payer, amount: amount } : payer
@@ -226,9 +252,18 @@ export default function Expenses() {
   };
 
   const handleAutoSplit = () => {
+    // Validate total amount is entered
     const totalAmount = parseFloat(formData.amount) || 0;
-    const selectedCount = splitPayers.filter(p => p.selected).length;
+    if (totalAmount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Please enter a valid total amount first',
+        variant: 'destructive',
+      });
+      return;
+    }
 
+    const selectedCount = splitPayers.filter(p => p.selected).length;
     if (selectedCount === 0) {
       toast({
         title: 'No payers selected',
@@ -238,11 +273,24 @@ export default function Expenses() {
       return;
     }
 
+    // Calculate per-person amount with proper rounding
     const perPerson = (totalAmount / selectedCount).toFixed(2);
+
+    // Handle rounding remainder - add to first selected payer
+    const remainder = (totalAmount - (parseFloat(perPerson) * selectedCount)).toFixed(2);
+    let isFirst = true;
+
     setSplitPayers(prev =>
-      prev.map(payer =>
-        payer.selected ? { ...payer, amount: perPerson } : payer
-      )
+      prev.map(payer => {
+        if (payer.selected) {
+          const amount = isFirst && parseFloat(remainder) !== 0
+            ? (parseFloat(perPerson) + parseFloat(remainder)).toFixed(2)
+            : perPerson;
+          isFirst = false;
+          return { ...payer, amount };
+        }
+        return payer;
+      })
     );
   };
 
@@ -326,7 +374,9 @@ export default function Expenses() {
       formatDate(expense.date),
       expense.title,
       expense.amount,
-      expense.paidBy?.name || 'Unknown',
+      expense.payers && expense.payers.length > 0
+        ? `Split: ${expense.payers.map(p => `${p.member.name} (৳${p.amount})`).join(', ')}`
+        : expense.paidBy?.name || 'Unknown',
     ]);
 
     const csvContent = [
@@ -359,7 +409,7 @@ export default function Expenses() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="soft-button">
+            <Button variant="outline" size="icon" className="soft-button" aria-label="Go back to dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
@@ -726,7 +776,17 @@ export default function Expenses() {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm sm:text-base truncate">{expense.title}</h3>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                            Paid by {expense.paidBy.name} • {formatDate(expense.date)}
+                            {expense.payers && expense.payers.length > 0 ? (
+                              // Split payment - show multiple payers
+                              <>
+                                Split: {expense.payers.map(p => p.member.name).join(', ')} • {formatDate(expense.date)}
+                              </>
+                            ) : (
+                              // Single payment
+                              <>
+                                Paid by {expense.paidBy?.name || 'Unknown'} • {formatDate(expense.date)}
+                              </>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -740,6 +800,7 @@ export default function Expenses() {
                         size="icon"
                         onClick={() => handleDeleteExpense(expense._id, expense.title)}
                         className="soft-button"
+                        aria-label={`Delete expense ${expense.title}`}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>

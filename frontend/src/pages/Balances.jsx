@@ -57,9 +57,9 @@ export default function Balances() {
   };
 
   const getBalanceColor = (balance) => {
-    if (balance > 0) return 'text-green-600';
-    if (balance < 0) return 'text-red-600';
-    return 'text-slate-600';
+    if (balance > 0) return 'text-green-700';
+    if (balance < 0) return 'text-red-700';
+    return 'text-slate-700';
   };
 
   const getBalanceIcon = (balance) => {
@@ -139,7 +139,7 @@ export default function Balances() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="soft-button">
+            <Button variant="outline" size="icon" className="soft-button" aria-label="Go back to dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
@@ -222,7 +222,7 @@ export default function Balances() {
                       variant="outline"
                       size="sm"
                       onClick={handleCopySettlements}
-                      className="h-9 sm:h-8 w-full sm:w-auto"
+                      className="h-11 sm:h-8 w-full sm:w-auto"
                     >
                       {copied ? (
                         <>
@@ -284,7 +284,7 @@ export default function Balances() {
                         <Button
                           onClick={() => handleMarkAsPaid(settlement)}
                           size="sm"
-                          className="w-full sm:w-auto h-9 soft-button"
+                          className="w-full sm:w-auto h-11 sm:h-9 soft-button"
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
                           <span className="text-xs sm:text-sm">Mark as Paid</span>
@@ -323,7 +323,7 @@ export default function Balances() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Select value={periodFilter} onValueChange={setPeriodFilter}>
-                        <SelectTrigger className="w-[140px] h-9">
+                        <SelectTrigger className="w-[140px] h-11 sm:h-9">
                           <Filter className="w-4 h-4 mr-2" />
                           <SelectValue />
                         </SelectTrigger>
@@ -338,7 +338,7 @@ export default function Balances() {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowHistory(!showHistory)}
-                        className="h-9"
+                        className="h-11 sm:h-9"
                       >
                         {showHistory ? 'Hide' : 'Show'}
                       </Button>
