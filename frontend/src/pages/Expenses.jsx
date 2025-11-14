@@ -8,7 +8,31 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter, Zap, Bus, UtensilsCrossed, ShoppingBag } from 'lucide-react';
+
+// Preset expense templates for quick adding
+const EXPENSE_TEMPLATES = {
+  transport: [
+    { title: 'Bus Fair UP', amount: '50', icon: '🚌' },
+    { title: 'Bus Fair DOWN', amount: '50', icon: '🚌' },
+    { title: 'Rickshaw', amount: '30', icon: '🛺' },
+    { title: 'CNG/Auto', amount: '100', icon: '🚕' },
+    { title: 'Uber/Pathao', amount: '150', icon: '🚗' },
+  ],
+  food: [
+    { title: 'Breakfast', amount: '80', icon: '🍳' },
+    { title: 'Lunch', amount: '150', icon: '🍱' },
+    { title: 'Dinner', amount: '200', icon: '🍽️' },
+    { title: 'Snacks', amount: '50', icon: '🍿' },
+    { title: 'Tea/Coffee', amount: '30', icon: '☕' },
+  ],
+  other: [
+    { title: 'Shopping', amount: '500', icon: '🛍️' },
+    { title: 'Movie', amount: '300', icon: '🎬' },
+    { title: 'Bills', amount: '200', icon: '💳' },
+    { title: 'Groceries', amount: '800', icon: '🛒' },
+  ],
+};
 
 export default function Expenses() {
   const [members, setMembers] = useState([]);
@@ -16,6 +40,7 @@ export default function Expenses() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [showTemplates, setShowTemplates] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -86,6 +111,21 @@ export default function Expenses() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setFormData({
+      ...formData,
+      title: template.title,
+      amount: template.amount,
+    });
+    setShowTemplates(false);
+    // Focus on paidBy field if it's empty
+    if (!formData.paidBy) {
+      setTimeout(() => {
+        document.querySelector('[name="paidBy"]')?.focus();
+      }, 100);
     }
   };
 
@@ -216,6 +256,102 @@ export default function Expenses() {
             </div>
           </div>
         </div>
+
+        {/* Quick Expense Templates */}
+        <Card className="mb-4 shadow-sm bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+          <CardHeader className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                <CardTitle className="text-base sm:text-lg">Quick Add</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="h-8 text-xs sm:text-sm"
+              >
+                {showTemplates ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+          </CardHeader>
+          {showTemplates && (
+            <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
+              {/* Transportation */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Bus className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-xs sm:text-sm font-semibold text-slate-700">Transportation</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {EXPENSE_TEMPLATES.transport.map((template, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTemplateSelect(template)}
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-blue-50 hover:border-blue-300"
+                    >
+                      <span className="text-base">{template.icon}</span>
+                      <span className="text-xs font-medium">{template.title}</span>
+                      <span className="text-xs text-muted-foreground">৳{template.amount}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Food */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <UtensilsCrossed className="w-4 h-4 text-orange-600" />
+                  <h3 className="text-xs sm:text-sm font-semibold text-slate-700">Food & Drinks</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {EXPENSE_TEMPLATES.food.map((template, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTemplateSelect(template)}
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-orange-50 hover:border-orange-300"
+                    >
+                      <span className="text-base">{template.icon}</span>
+                      <span className="text-xs font-medium">{template.title}</span>
+                      <span className="text-xs text-muted-foreground">৳{template.amount}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Other */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <ShoppingBag className="w-4 h-4 text-green-600" />
+                  <h3 className="text-xs sm:text-sm font-semibold text-slate-700">Other</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {EXPENSE_TEMPLATES.other.map((template, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTemplateSelect(template)}
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-green-50 hover:border-green-300"
+                    >
+                      <span className="text-base">{template.icon}</span>
+                      <span className="text-xs font-medium">{template.title}</span>
+                      <span className="text-xs text-muted-foreground">৳{template.amount}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center mt-3 pt-3 border-t">
+                Click any template to auto-fill the form below
+              </p>
+            </CardContent>
+          )}
+        </Card>
 
         {/* Mobile-Optimized Add Expense Form */}
         <Card className="mb-4 sm:mb-6 shadow-sm">
