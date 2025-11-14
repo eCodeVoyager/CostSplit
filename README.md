@@ -17,7 +17,9 @@ CostSplit is a simple yet powerful expense sharing manager that allows groups to
 - **Single Shared Authentication** - One login for the entire group
 - **Member Management** - Add/remove members dynamically
 - **Expense Tracking** - Record expenses with who paid
-- **Automatic Balance Calculation** - Smart algorithm calculates balances
+- **Multi-Payer Support** - Split expenses among multiple payers with different amounts (e.g., A pays 60৳, B pays 40৳ for 100৳ expense)
+- **Auto-Split** - Automatically divide expenses equally among selected payers
+- **Automatic Balance Calculation** - Smart algorithm calculates balances including multi-payer scenarios
 - **Settlement Generation** - Optimized "who owes whom" instructions
 - **Clean Modern UI** - Built with shadcn/ui and TailwindCSS
 - **Responsive Design** - Works on all devices
