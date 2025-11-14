@@ -4,9 +4,9 @@ const mongoose = require('mongoose');
 
 describe('Auth API', () => {
   afterAll(async () => {
-    await mongoose.connection.close();
-    server.close();
-  });
+    await new Promise((resolve) => server.close(resolve));
+    await mongoose.disconnect();
+  }, 30000);
 
   describe('POST /api/auth/login', () => {
     it('should login with correct credentials', async () => {

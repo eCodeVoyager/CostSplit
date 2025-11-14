@@ -23,7 +23,7 @@ services:
       - NODE_ENV=production
 
       # CORS Configuration
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     networks:
       - costsplit-network
     healthcheck:
@@ -32,15 +32,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    depends_on:
-      - backend-health
-
-  # Backend health check helper
-  backend-health:
-    image: alpine:latest
-    command: echo "Backend service starting..."
-    networks:
-      - costsplit-network
 
   # Frontend Service
   frontend:
