@@ -7,8 +7,9 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter, Zap, Bus, UtensilsCrossed, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter, Zap, Bus, UtensilsCrossed, ShoppingBag, Users2 } from 'lucide-react';
 
 // Preset expense templates for quick adding
 const EXPENSE_TEMPLATES = {
@@ -41,6 +42,8 @@ export default function Expenses() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splitPayers, setSplitPayers] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -80,28 +83,84 @@ export default function Expenses() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.amount || !formData.paidBy) {
-      toast({
-        title: 'Error',
-        description: 'Please fill all required fields',
-        variant: 'destructive',
-      });
-      return;
+
+    // Validation for single payment
+    if (!isSplitPayment) {
+      if (!formData.title || !formData.amount || !formData.paidBy) {
+        toast({
+          title: 'Error',
+          description: 'Please fill all required fields',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else {
+      // Validation for split payment
+      if (!formData.title || !formData.amount) {
+        toast({
+          title: 'Error',
+          description: 'Please enter title and total amount',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const selectedPayers = splitPayers.filter(p => p.selected && p.amount > 0);
+      if (selectedPayers.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Please select at least one payer with amount',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const totalPaid = selectedPayers.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      const totalAmount = parseFloat(formData.amount);
+
+      if (Math.abs(totalPaid - totalAmount) > 0.01) {
+        toast({
+          title: 'Error',
+          description: `Total paid (৳${totalPaid.toFixed(2)}) must equal expense amount (৳${totalAmount})`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      await expensesAPI.create(formData);
+      if (isSplitPayment) {
+        // Create multiple expenses for split payment
+        const selectedPayers = splitPayers.filter(p => p.selected && p.amount > 0);
+        await Promise.all(
+          selectedPayers.map(payer =>
+            expensesAPI.create({
+              title: `${formData.title} (Split - ${payer.name})`,
+              amount: payer.amount,
+              paidBy: payer.id,
+              date: formData.date,
+            })
+          )
+        );
+      } else {
+        // Single payment
+        await expensesAPI.create(formData);
+      }
+
       toast({
         title: 'Success',
         description: 'Expense added successfully',
       });
+
       setFormData({
         title: '',
         amount: '',
         paidBy: '',
         date: new Date().toISOString().split('T')[0],
       });
+      setIsSplitPayment(false);
+      setSplitPayers([]);
       fetchExpenses();
     } catch (error) {
       toast({
@@ -122,11 +181,69 @@ export default function Expenses() {
     });
     setShowTemplates(false);
     // Focus on paidBy field if it's empty
-    if (!formData.paidBy) {
+    if (!formData.paidBy && !isSplitPayment) {
       setTimeout(() => {
         document.querySelector('[name="paidBy"]')?.focus();
       }, 100);
     }
+  };
+
+  const handleSplitPaymentToggle = () => {
+    const newSplitMode = !isSplitPayment;
+    setIsSplitPayment(newSplitMode);
+
+    if (newSplitMode) {
+      // Initialize split payers when enabling split mode
+      const totalAmount = parseFloat(formData.amount) || 0;
+      const perPerson = members.length > 0 ? (totalAmount / members.length).toFixed(2) : '0';
+      setSplitPayers(
+        members.map(member => ({
+          id: member._id,
+          name: member.name,
+          selected: false,
+          amount: perPerson,
+        }))
+      );
+    } else {
+      setSplitPayers([]);
+    }
+  };
+
+  const handleSplitPayerToggle = (payerId) => {
+    setSplitPayers(prev =>
+      prev.map(payer =>
+        payer.id === payerId ? { ...payer, selected: !payer.selected } : payer
+      )
+    );
+  };
+
+  const handleSplitAmountChange = (payerId, amount) => {
+    setSplitPayers(prev =>
+      prev.map(payer =>
+        payer.id === payerId ? { ...payer, amount: amount } : payer
+      )
+    );
+  };
+
+  const handleAutoSplit = () => {
+    const totalAmount = parseFloat(formData.amount) || 0;
+    const selectedCount = splitPayers.filter(p => p.selected).length;
+
+    if (selectedCount === 0) {
+      toast({
+        title: 'No payers selected',
+        description: 'Please select members first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const perPerson = (totalAmount / selectedCount).toFixed(2);
+    setSplitPayers(prev =>
+      prev.map(payer =>
+        payer.selected ? { ...payer, amount: perPerson } : payer
+      )
+    );
   };
 
   const handleDeleteExpense = async (id, title) => {
@@ -356,10 +473,23 @@ export default function Expenses() {
         {/* Add Expense Form */}
         <Card className="mb-6 smooth-card">
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Plus className="w-5 h-5" />
-              Add New Expense
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Plus className="w-5 h-5" />
+                Add New Expense
+              </CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSplitPaymentToggle}
+                disabled={members.length === 0}
+                className="soft-button"
+              >
+                <Users2 className="w-4 h-4 mr-2" />
+                {isSplitPayment ? 'Single' : 'Split'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -376,7 +506,7 @@ export default function Expenses() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount" className="text-sm">Amount (৳)</Label>
+                  <Label htmlFor="amount" className="text-sm">Total Amount (৳)</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -389,25 +519,30 @@ export default function Expenses() {
                     className="h-11 sm:h-10 text-base"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="paidBy" className="text-sm">Paid By</Label>
-                  <Select
-                    value={formData.paidBy}
-                    onValueChange={(value) => setFormData({ ...formData, paidBy: value })}
-                    disabled={isLoading || members.length === 0}
-                  >
-                    <SelectTrigger className="h-11 sm:h-10 text-base">
-                      <SelectValue placeholder="Select member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {members.map((member) => (
-                        <SelectItem key={member._id} value={member._id}>
-                          {member.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Single Payer Mode */}
+                {!isSplitPayment && (
+                  <div className="space-y-2">
+                    <Label htmlFor="paidBy" className="text-sm">Paid By</Label>
+                    <Select
+                      value={formData.paidBy}
+                      onValueChange={(value) => setFormData({ ...formData, paidBy: value })}
+                      disabled={isLoading || members.length === 0}
+                    >
+                      <SelectTrigger className="h-11 sm:h-10 text-base">
+                        <SelectValue placeholder="Select member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {members.map((member) => (
+                          <SelectItem key={member._id} value={member._id}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="date" className="text-sm">Date</Label>
                   <Input
@@ -420,6 +555,63 @@ export default function Expenses() {
                   />
                 </div>
               </div>
+
+              {/* Split Payment Mode */}
+              {isSplitPayment && (
+                <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Who paid?</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAutoSplit}
+                      className="h-8 text-xs"
+                    >
+                      Auto Split
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {splitPayers.map((payer) => (
+                      <div key={payer.id} className="flex items-center gap-3 p-2 bg-card rounded border">
+                        <Checkbox
+                          id={`payer-${payer.id}`}
+                          checked={payer.selected}
+                          onCheckedChange={() => handleSplitPayerToggle(payer.id)}
+                        />
+                        <label
+                          htmlFor={`payer-${payer.id}`}
+                          className="flex-1 text-sm font-medium cursor-pointer"
+                        >
+                          {payer.name}
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={payer.amount}
+                          onChange={(e) => handleSplitAmountChange(payer.id, e.target.value)}
+                          disabled={!payer.selected || isLoading}
+                          className="w-24 h-8 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {splitPayers.length > 0 && (
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="font-medium">Total Paid:</span>
+                      <span className="font-bold">
+                        ৳{splitPayers
+                          .filter(p => p.selected)
+                          .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
+                          .toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <Button
                 type="submit"
                 disabled={isLoading || members.length === 0}
