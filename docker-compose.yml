@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: costsplit-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # MongoDB Connection (External Database)
+      - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017/costsplit}
+
+      # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRE=${JWT_EXPIRE:-7d}
+
+      # Server Configuration
+      - PORT=5000
+      - NODE_ENV=production
+
+      # CORS Configuration
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+    networks:
+      - costsplit-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - backend-health
+
+  # Backend health check helper
+  backend-health:
+    image: alpine:latest
+    command: echo "Backend service starting..."
+    networks:
+      - costsplit-network
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: costsplit-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
+    networks:
+      - costsplit-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  costsplit-network:
+    driver: bridge
+
+# Note: MongoDB is NOT included in this Docker setup.
+# You need to provide an external MongoDB connection string via MONGODB_URI environment variable.
+# Examples:
+# - Local MongoDB: mongodb://host.docker.internal:27017/costsplit
+# - MongoDB Atlas: mongodb+srv://username:password@cluster.mongodb.net/costsplit
+# - Remote MongoDB: mongodb://username:password@remote-host:27017/costsplit

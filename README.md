@@ -96,7 +96,40 @@ CostSplit/
 
 ## Installation
 
-### Prerequisites
+You can run CostSplit either **using Docker** (recommended for quick setup) or **manually** (traditional setup).
+
+### 🐳 Option 1: Docker Setup (Recommended)
+
+**Prerequisites:**
+- Docker and Docker Compose installed
+- External MongoDB database (local, Atlas, or remote)
+
+**Quick Start:**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/eCodeVoyager/CostSplit.git
+cd CostSplit
+
+# 2. Create .env file
+cp .env.example .env
+# Edit .env and configure your MongoDB connection
+
+# 3. Start with Docker
+docker-compose up -d
+
+# 4. Access the application
+# Frontend: http://localhost:3000
+# Backend: http://localhost:5000
+```
+
+**📚 Full Docker documentation:** See [DOCKER.md](./DOCKER.md) for complete Docker setup guide, troubleshooting, and advanced configurations.
+
+---
+
+### 💻 Option 2: Manual Setup
+
+**Prerequisites:**
 - Node.js (v16 or higher)
 - MongoDB (local or cloud instance)
 - npm or yarn
