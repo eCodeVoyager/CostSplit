@@ -1,22 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { balancesAPI } from '../lib/api';
-import { formatCurrency } from '../lib/utils';
+import { balancesAPI, settlementsAPI } from '../lib/api';
+import { formatCurrency, formatDate } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Scale, TrendingUp, TrendingDown, ArrowRight, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Scale, TrendingUp, TrendingDown, ArrowRight, Copy, Check, CheckCircle2, History, Filter } from 'lucide-react';
 
 export default function Balances() {
   const [balances, setBalances] = useState([]);
   const [settlements, setSettlements] = useState([]);
+  const [completedSettlements, setCompletedSettlements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState('all');
+  const [showHistory, setShowHistory] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchBalances();
   }, []);
+
+  useEffect(() => {
+    if (showHistory) {
+      fetchSettlementHistory();
+    }
+  }, [periodFilter, showHistory]);
 
   const fetchBalances = async () => {
     setIsLoading(true);
@@ -24,6 +34,7 @@ export default function Balances() {
       const response = await balancesAPI.get();
       setBalances(response.data.balances);
       setSettlements(response.data.settlements);
+      setCompletedSettlements(response.data.completedSettlements || []);
     } catch (error) {
       toast({
         title: 'Error',
@@ -32,6 +43,16 @@ export default function Balances() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSettlementHistory = async () => {
+    try {
+      const params = periodFilter !== 'all' ? { period: periodFilter } : {};
+      const response = await settlementsAPI.getHistory(params);
+      setCompletedSettlements(response.data.settlements || []);
+    } catch (error) {
+      console.error('Error fetching settlement history:', error);
     }
   };
 
@@ -51,6 +72,31 @@ export default function Balances() {
     if (balance > 0) return 'bg-green-100';
     if (balance < 0) return 'bg-red-100';
     return 'bg-slate-100';
+  };
+
+  const handleMarkAsPaid = async (settlement) => {
+    try {
+      await settlementsAPI.markAsPaid({
+        from: settlement.fromId,
+        to: settlement.toId,
+        amount: settlement.amount,
+        note: `Settlement payment: ${settlement.from} → ${settlement.to}`,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Settlement marked as paid',
+      });
+
+      // Refresh balances
+      fetchBalances();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to mark settlement as paid',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleCopySettlements = () => {
@@ -207,30 +253,42 @@ export default function Balances() {
                     {settlements.map((settlement, index) => (
                       <div
                         key={index}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200 active:bg-orange-100 transition-colors"
+                        className="flex flex-col gap-3 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200"
                       >
-                        <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs sm:text-sm font-semibold text-orange-700">
-                                {settlement.from.charAt(0).toUpperCase()}
-                              </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center">
+                                <span className="text-xs sm:text-sm font-semibold text-orange-700">
+                                  {settlement.from.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-medium text-sm sm:text-base hidden sm:block">{settlement.from}</span>
+                              <span className="font-medium text-xs sm:hidden">{settlement.from}</span>
                             </div>
-                            <span className="font-medium text-sm sm:text-base truncate">{settlement.from}</span>
+                            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 flex-shrink-0" />
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center">
+                                <span className="text-xs sm:text-sm font-semibold text-green-700">
+                                  {settlement.to.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-medium text-sm sm:text-base hidden sm:block">{settlement.to}</span>
+                              <span className="font-medium text-xs sm:hidden">{settlement.to}</span>
+                            </div>
                           </div>
-                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 flex-shrink-0" />
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs sm:text-sm font-semibold text-green-700">
-                                {settlement.to.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <span className="font-medium text-sm sm:text-base truncate">{settlement.to}</span>
+                          <div className="text-base sm:text-lg font-bold text-orange-600 flex-shrink-0">
+                            {formatCurrency(settlement.amount)}
                           </div>
                         </div>
-                        <div className="text-base sm:text-lg font-bold text-orange-600 text-right sm:text-left flex-shrink-0">
-                          {formatCurrency(settlement.amount)}
-                        </div>
+                        <Button
+                          onClick={() => handleMarkAsPaid(settlement)}
+                          size="sm"
+                          className="w-full sm:w-auto h-9 bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          <span className="text-xs sm:text-sm">Mark as Paid</span>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -248,9 +306,73 @@ export default function Balances() {
                   <ol className="list-decimal list-inside space-y-2">
                     <li>Each person listed on the left should pay the person on the right</li>
                     <li>Once all transactions are completed, everyone's balance will be zero</li>
-                    <li>You can mark expenses as paid or delete them after settlement</li>
+                    <li>Click "Mark as Paid" when payment is completed</li>
                   </ol>
                 </CardContent>
+              </Card>
+            )}
+
+            {/* Settlement History */}
+            {completedSettlements.length > 0 && (
+              <Card className="shadow-sm">
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <History className="w-5 h-5 text-slate-600" />
+                      <CardTitle className="text-lg sm:text-xl">Payment History</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                        <SelectTrigger className="w-[140px] h-9">
+                          <Filter className="w-4 h-4 mr-2" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Time</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="week">This Week</SelectItem>
+                          <SelectItem value="month">This Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowHistory(!showHistory)}
+                        className="h-9"
+                      >
+                        {showHistory ? 'Hide' : 'Show'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                {showHistory && (
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                    <div className="space-y-2">
+                      {completedSettlements.map((settlement) => (
+                        <div
+                          key={settlement._id}
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-green-50 rounded-lg border border-green-200"
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <span className="text-sm">
+                              <span className="font-medium">{settlement.from}</span>
+                              <ArrowRight className="w-3 h-3 inline mx-1" />
+                              <span className="font-medium">{settlement.to}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
+                            <span className="font-semibold text-green-700">
+                              {formatCurrency(settlement.amount)}
+                            </span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>{formatDate(settlement.paidDate)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
           </div>

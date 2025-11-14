@@ -14,11 +14,27 @@ const expenseSchema = new mongoose.Schema(
       required: [true, 'Amount is required'],
       min: [0.01, 'Amount must be greater than 0'],
     },
+    // Single payer (for backward compatibility)
     paidBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Member',
-      required: [true, 'Paid by member is required'],
+      required: function() {
+        return !this.payers || this.payers.length === 0;
+      },
     },
+    // Multiple payers (when expense is split among multiple people who paid)
+    payers: [{
+      member: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Member',
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+        min: [0.01, 'Payer amount must be greater than 0'],
+      },
+    }],
     date: {
       type: Date,
       default: Date.now,
@@ -26,6 +42,14 @@ const expenseSchema = new mongoose.Schema(
     memberCountAtTime: {
       type: Number,
       required: true,
+    },
+    // Settlement tracking
+    settled: {
+      type: Boolean,
+      default: false,
+    },
+    settledDate: {
+      type: Date,
     },
   },
   {

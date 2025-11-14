@@ -48,6 +48,7 @@ export const membersAPI = {
 export const expensesAPI = {
   getAll: (params) => api.get('/expenses', { params }),
   create: (data) => api.post('/expenses', data),
+  toggleSettled: (id, settled) => api.patch(`/expenses/${id}/settle`, { settled }),
   delete: (id) => api.delete(`/expenses/${id}`),
   getStats: () => api.get('/expenses/stats'),
 };
@@ -55,6 +56,13 @@ export const expensesAPI = {
 // Balances API
 export const balancesAPI = {
   get: () => api.get('/balances'),
+};
+
+// Settlements API
+export const settlementsAPI = {
+  markAsPaid: (data) => api.post('/settlements', data),
+  getHistory: (params) => api.get('/settlements/history', { params }),
+  delete: (id) => api.delete(`/settlements/${id}`),
 };
 
 export default api;

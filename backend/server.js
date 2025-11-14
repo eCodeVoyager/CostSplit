@@ -11,6 +11,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const memberRoutes = require('./src/routes/memberRoutes');
 const expenseRoutes = require('./src/routes/expenseRoutes');
 const balanceRoutes = require('./src/routes/balanceRoutes');
+const settlementRoutes = require('./src/routes/settlements');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -89,6 +90,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/balances', balanceRoutes);
+app.use('/api/settlements', settlementRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -3,7 +3,7 @@
  * Positive balance = member should receive money (creditor)
  * Negative balance = member owes money (debtor)
  */
-const calculateBalances = (members, expenses) => {
+const calculateBalances = (members, expenses, completedSettlements = []) => {
   const balances = {};
 
   // Initialize all members with 0 balance
@@ -15,24 +15,54 @@ const calculateBalances = (members, expenses) => {
     };
   });
 
-  // Process each expense
+  // Process each expense (skip settled expenses)
   expenses.forEach((expense) => {
-    const totalMembers = expense.memberCountAtTime;
-    const sharePerPerson = expense.amount / totalMembers;
-    const payerId = expense.paidBy._id ? expense.paidBy._id.toString() : expense.paidBy.toString();
-
-    // The payer gets credited the full amount (they paid it)
-    if (balances[payerId]) {
-      balances[payerId].balance += expense.amount;
+    // Skip settled expenses
+    if (expense.settled) {
+      return;
     }
 
-    // Everyone (including payer) gets debited their share
+    const totalMembers = expense.memberCountAtTime;
+    const sharePerPerson = expense.amount / totalMembers;
+
+    // Handle multi-payer expenses
+    if (expense.payers && expense.payers.length > 0) {
+      // Multi-payer: each payer gets credited their paid amount
+      expense.payers.forEach((payer) => {
+        const payerId = payer.member._id ? payer.member._id.toString() : payer.member.toString();
+        if (balances[payerId]) {
+          balances[payerId].balance += payer.amount;
+        }
+      });
+    } else {
+      // Single payer: credit the full amount
+      const payerId = expense.paidBy._id ? expense.paidBy._id.toString() : expense.paidBy.toString();
+      if (balances[payerId]) {
+        balances[payerId].balance += expense.amount;
+      }
+    }
+
+    // Everyone (including payer(s)) gets debited their share
     members.forEach((member) => {
       const memberId = member._id.toString();
       if (balances[memberId]) {
         balances[memberId].balance -= sharePerPerson;
       }
     });
+  });
+
+  // Apply completed settlements (adjust balances)
+  completedSettlements.forEach((settlement) => {
+    const fromId = settlement.from._id ? settlement.from._id.toString() : settlement.from.toString();
+    const toId = settlement.to._id ? settlement.to._id.toString() : settlement.to.toString();
+
+    // When someone pays back: debtor balance increases, creditor balance decreases
+    if (balances[fromId]) {
+      balances[fromId].balance += settlement.amount;
+    }
+    if (balances[toId]) {
+      balances[toId].balance -= settlement.amount;
+    }
   });
 
   // Round balances to 2 decimal places

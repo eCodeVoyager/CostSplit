@@ -50,6 +50,7 @@ const getAllExpenses = async (req, res) => {
     const [expenses, totalCount] = await Promise.all([
       Expense.find(query)
         .populate('paidBy', 'name')
+        .populate('payers.member', 'name')
         .sort({ date: -1 })
         .limit(limitNum)
         .skip(skip),
@@ -76,7 +77,7 @@ const getAllExpenses = async (req, res) => {
  */
 const createExpense = async (req, res) => {
   try {
-    const { title, amount, paidBy, date } = req.body;
+    const { title, amount, paidBy, payers, date } = req.body;
 
     // Validation - Title
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -115,20 +116,75 @@ const createExpense = async (req, res) => {
     // Round to 2 decimal places
     const roundedAmount = Math.round(parsedAmount * 100) / 100;
 
-    // Validation - PaidBy
-    if (!paidBy) {
-      return res.status(400).json({ message: 'Paid by member is required' });
-    }
+    // Validation - Payer(s)
+    let validatedPayers = null;
+    let validatedPaidBy = null;
 
-    // Validate MongoDB ObjectId format
-    if (!paidBy.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: 'Invalid member ID format' });
-    }
+    if (payers && Array.isArray(payers) && payers.length > 0) {
+      // Multi-payer mode
+      if (payers.length > 20) {
+        return res.status(400).json({ message: 'Cannot have more than 20 payers' });
+      }
 
-    // Verify member exists and is active
-    const member = await Member.findById(paidBy);
-    if (!member || !member.isActive) {
-      return res.status(400).json({ message: 'Selected member not found or inactive' });
+      // Validate each payer
+      const payerPromises = payers.map(async (payer) => {
+        if (!payer.member || !payer.amount) {
+          throw new Error('Each payer must have member and amount');
+        }
+
+        // Validate MongoDB ObjectId format
+        if (!payer.member.match(/^[0-9a-fA-F]{24}$/)) {
+          throw new Error('Invalid payer member ID format');
+        }
+
+        const payerAmount = parseFloat(payer.amount);
+        if (isNaN(payerAmount) || payerAmount <= 0) {
+          throw new Error('Each payer amount must be greater than 0');
+        }
+
+        // Verify member exists
+        const member = await Member.findById(payer.member);
+        if (!member || !member.isActive) {
+          throw new Error(`Payer member ${payer.member} not found or inactive`);
+        }
+
+        return {
+          member: payer.member,
+          amount: Math.round(payerAmount * 100) / 100,
+        };
+      });
+
+      try {
+        validatedPayers = await Promise.all(payerPromises);
+
+        // Verify total payer amounts match expense amount
+        const totalPaid = validatedPayers.reduce((sum, p) => sum + p.amount, 0);
+        if (Math.abs(totalPaid - roundedAmount) > 0.01) {
+          return res.status(400).json({
+            message: `Total payer amounts (${totalPaid}) must equal expense amount (${roundedAmount})`
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
+      }
+    } else {
+      // Single payer mode
+      if (!paidBy) {
+        return res.status(400).json({ message: 'Paid by member is required' });
+      }
+
+      // Validate MongoDB ObjectId format
+      if (!paidBy.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ message: 'Invalid member ID format' });
+      }
+
+      // Verify member exists and is active
+      const member = await Member.findById(paidBy);
+      if (!member || !member.isActive) {
+        return res.status(400).json({ message: 'Selected member not found or inactive' });
+      }
+
+      validatedPaidBy = paidBy;
     }
 
     // Get current active member count
@@ -169,18 +225,29 @@ const createExpense = async (req, res) => {
       });
     }
 
-    const expense = new Expense({
+    const expenseData = {
       title: sanitizedTitle,
       amount: roundedAmount,
-      paidBy,
       date: expenseDate,
       memberCountAtTime: memberCount,
-    });
+    };
 
+    // Add either payers or paidBy
+    if (validatedPayers) {
+      expenseData.payers = validatedPayers;
+    } else {
+      expenseData.paidBy = validatedPaidBy;
+    }
+
+    const expense = new Expense(expenseData);
     await expense.save();
 
-    // Populate the paidBy field before sending response
-    await expense.populate('paidBy', 'name');
+    // Populate payers or paidBy before sending response
+    if (validatedPayers) {
+      await expense.populate('payers.member', 'name');
+    } else {
+      await expense.populate('paidBy', 'name');
+    }
 
     res.status(201).json(expense);
   } catch (error) {
@@ -193,6 +260,48 @@ const createExpense = async (req, res) => {
     }
 
     res.status(500).json({ message: 'Unable to create expense. Please try again.' });
+  }
+};
+
+/**
+ * Toggle expense settled status
+ */
+const toggleExpenseSettled = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { settled } = req.body;
+
+    // Validate MongoDB ObjectId
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid expense ID' });
+    }
+
+    const expense = await Expense.findById(id);
+
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Toggle or set settled status
+    expense.settled = typeof settled === 'boolean' ? settled : !expense.settled;
+    expense.settledDate = expense.settled ? new Date() : null;
+
+    await expense.save();
+
+    // Populate before sending response
+    if (expense.payers && expense.payers.length > 0) {
+      await expense.populate('payers.member', 'name');
+    } else {
+      await expense.populate('paidBy', 'name');
+    }
+
+    res.status(200).json({
+      message: expense.settled ? 'Expense marked as settled' : 'Expense marked as unsettled',
+      expense,
+    });
+  } catch (error) {
+    console.error('Toggle expense settled error:', error);
+    res.status(500).json({ message: 'Unable to update expense. Please try again.' });
   }
 };
 
@@ -247,6 +356,7 @@ const getExpenseStats = async (req, res) => {
 module.exports = {
   getAllExpenses,
   createExpense,
+  toggleExpenseSettled,
   deleteExpense,
   getExpenseStats,
 };
