@@ -39,11 +39,13 @@ export default function Expenses() {
   const fetchExpenses = async () => {
     try {
       const response = await expensesAPI.getAll();
-      setExpenses(response.data);
+      // Handle both old and new pagination format
+      const expenseData = response.data.expenses || response.data;
+      setExpenses(expenseData);
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to fetch expenses',
+        description: error.response?.data?.message || 'Failed to fetch expenses',
         variant: 'destructive',
       });
     }
