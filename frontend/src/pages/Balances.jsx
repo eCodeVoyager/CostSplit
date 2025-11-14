@@ -42,9 +42,9 @@ export default function Balances() {
   };
 
   const getBalanceIcon = (balance) => {
-    if (balance > 0) return <TrendingUp className="w-5 h-5" />;
-    if (balance < 0) return <TrendingDown className="w-5 h-5" />;
-    return <Scale className="w-5 h-5" />;
+    if (balance > 0) return <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />;
+    if (balance < 0) return <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" />;
+    return <Scale className="w-4 h-4 sm:w-5 sm:h-5" />;
   };
 
   const getBalanceBg = (balance) => {
@@ -88,66 +88,66 @@ export default function Balances() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-6">
+      <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
+        {/* Mobile-Optimized Header */}
+        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Scale className="w-5 h-5 text-purple-600" />
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">Balances</h1>
-              <p className="text-sm text-muted-foreground">View balances and settlements</p>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold">Balances</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">View balances and settlements</p>
             </div>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading balances...</p>
+          <div className="text-center py-8 sm:py-12">
+            <p className="text-sm sm:text-base text-muted-foreground">Loading balances...</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Member Balances */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Member Balances</CardTitle>
-                <CardDescription>
+          <div className="space-y-4 sm:space-y-6">
+            {/* Mobile-Optimized Member Balances */}
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg sm:text-xl">Member Balances</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   Positive (+) means should receive money • Negative (-) means owes money
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 {balances.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Scale className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No balance data yet. Add members and expenses to see balances.</p>
+                  <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                    <Scale className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 opacity-50" />
+                    <p className="text-sm sm:text-base">No balance data yet. Add members and expenses to see balances.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {balances.map((balance) => (
                       <div
                         key={balance.memberId}
-                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+                        className="flex items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-lg active:bg-slate-100 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center ${getBalanceBg(
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getBalanceBg(
                               balance.balance
                             )}`}
                           >
-                            <span className="text-lg font-semibold">
+                            <span className="text-base sm:text-lg font-semibold">
                               {balance.memberName.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <span className="font-medium">{balance.memberName}</span>
+                          <span className="font-medium text-sm sm:text-base truncate">{balance.memberName}</span>
                         </div>
-                        <div className={`flex items-center gap-2 font-bold text-lg ${getBalanceColor(balance.balance)}`}>
+                        <div className={`flex items-center gap-1 sm:gap-2 font-bold text-base sm:text-lg flex-shrink-0 ml-2 ${getBalanceColor(balance.balance)}`}>
                           {getBalanceIcon(balance.balance)}
                           <span>
                             {balance.balance > 0 && '+'}
@@ -161,69 +161,74 @@ export default function Balances() {
               </CardContent>
             </Card>
 
-            {/* Settlement Instructions */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            {/* Mobile-Optimized Settlement Instructions */}
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <CardTitle>Settlement Instructions</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Settlement Instructions</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Follow these transactions to settle all balances
                     </CardDescription>
                   </div>
                   {settlements.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={handleCopySettlements}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopySettlements}
+                      className="h-9 sm:h-8 w-full sm:w-auto"
+                    >
                       {copied ? (
                         <>
                           <Check className="w-4 h-4 mr-2" />
-                          Copied
+                          <span className="text-sm">Copied</span>
                         </>
                       ) : (
                         <>
                           <Copy className="w-4 h-4 mr-2" />
-                          Copy
+                          <span className="text-sm">Copy</span>
                         </>
                       )}
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 {settlements.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <div className="w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                      <Scale className="w-6 h-6 text-green-600" />
+                  <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                     </div>
-                    <p className="font-medium text-green-600">All Settled!</p>
-                    <p className="text-sm">No pending settlements required.</p>
+                    <p className="font-medium text-green-600 text-base sm:text-lg">All Settled!</p>
+                    <p className="text-xs sm:text-sm">No pending settlements required.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {settlements.map((settlement, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200 active:bg-orange-100 transition-colors"
                       >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-semibold text-orange-700">
+                        <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs sm:text-sm font-semibold text-orange-700">
                                 {settlement.from.charAt(0).toUpperCase()}
                               </span>
                             </div>
-                            <span className="font-medium">{settlement.from}</span>
+                            <span className="font-medium text-sm sm:text-base truncate">{settlement.from}</span>
                           </div>
-                          <ArrowRight className="w-5 h-5 text-orange-600" />
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-semibold text-green-700">
+                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 flex-shrink-0" />
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs sm:text-sm font-semibold text-green-700">
                                 {settlement.to.charAt(0).toUpperCase()}
                               </span>
                             </div>
-                            <span className="font-medium">{settlement.to}</span>
+                            <span className="font-medium text-sm sm:text-base truncate">{settlement.to}</span>
                           </div>
                         </div>
-                        <div className="text-lg font-bold text-orange-600">
+                        <div className="text-base sm:text-lg font-bold text-orange-600 text-right sm:text-left flex-shrink-0">
                           {formatCurrency(settlement.amount)}
                         </div>
                       </div>
@@ -233,13 +238,13 @@ export default function Balances() {
               </CardContent>
             </Card>
 
-            {/* Summary */}
+            {/* Mobile-Optimized Summary */}
             {settlements.length > 0 && (
-              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                <CardHeader>
-                  <CardTitle className="text-blue-900">How to Settle</CardTitle>
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-blue-900 text-lg sm:text-xl">How to Settle</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-blue-800">
+                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 text-xs sm:text-sm text-blue-800">
                   <ol className="list-decimal list-inside space-y-2">
                     <li>Each person listed on the left should pay the person on the right</li>
                     <li>Once all transactions are completed, everyone's balance will be zero</li>

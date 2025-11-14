@@ -39,21 +39,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-            <Wallet className="w-6 h-6 text-primary-foreground" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-3 sm:p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-4 text-center pb-6">
+          <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-primary rounded-full flex items-center justify-center">
+            <Wallet className="w-7 h-7 sm:w-8 sm:h-8 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-3xl">CostSplit</CardTitle>
-            <CardDescription className="mt-2">Shared Expense Manager</CardDescription>
+            <CardTitle className="text-3xl sm:text-4xl font-bold">CostSplit</CardTitle>
+            <CardDescription className="mt-2 text-base">Shared Expense Manager</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="px-4 sm:px-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-base">Username</Label>
               <Input
                 id="username"
                 type="text"
@@ -62,10 +62,11 @@ export default function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 disabled={isLoading}
+                className="h-12 text-base"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-base">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -74,15 +75,16 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="h-12 text-base"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Default credentials:</p>
-            <p className="font-mono">admin / 1234</p>
+          <div className="mt-6 text-center text-sm text-muted-foreground bg-slate-50 p-3 rounded-lg">
+            <p className="font-medium">Default credentials:</p>
+            <p className="font-mono text-base mt-1">admin / 1234</p>
           </div>
         </CardContent>
       </Card>
