@@ -23,6 +23,16 @@ CostSplit is a simple yet powerful expense sharing manager that allows groups to
 - **Responsive Design** - Works on all devices
 - **Comprehensive Tests** - Full Jest test coverage
 
+### Advanced Features
+- **Enhanced Dashboard** - Quick actions, recent expenses, members preview, and average expense stats
+- **Expense Search** - Real-time search by title or member name
+- **Date Filtering** - View expenses by Today, This Week, This Month, or All Time
+- **CSV Export** - Download filtered expenses for external analysis
+- **Copy Settlements** - One-click copy settlement instructions to clipboard
+- **Smart Filtering** - Shows filtered count and easy filter clearing
+- **Loading States** - Smooth loading indicators throughout
+- **Empty States** - Helpful messages and call-to-actions
+
 ### How It Works
 
 1. **Add Members** - Start by adding group members
