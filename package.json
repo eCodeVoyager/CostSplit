@@ -1,0 +1,21 @@
+{
+  "name": "costsplit",
+  "version": "1.0.0",
+  "description": "CostSplit - Shared Expense Manager (MERN Stack)",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test": "npm run test:backend && npm run test:frontend",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": ["expense", "splitter", "MERN", "react", "mongodb", "express"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
