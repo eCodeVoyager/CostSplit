@@ -237,39 +237,39 @@ export default function Expenses() {
   const filteredExpenses = getFilteredExpenses();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-6">
+    <div className="min-h-screen gradient-bg pb-6">
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-4xl">
         {/* Mobile-Optimized Header */}
-        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8">
+        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 fade-in">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10">
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 soft-button">
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-emerald-200">
+              <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-bold">Expenses</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">Expenses</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Track and manage expenses</p>
             </div>
           </div>
         </div>
 
         {/* Quick Expense Templates */}
-        <Card className="mb-4 shadow-sm bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+        <Card className="mb-4 smooth-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 fade-in" style={{ animationDelay: '0.1s' }}>
           <CardHeader className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 <CardTitle className="text-base sm:text-lg">Quick Add</CardTitle>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowTemplates(!showTemplates)}
-                className="h-8 text-xs sm:text-sm"
+                className="h-8 text-xs sm:text-sm hover:bg-primary/10"
               >
                 {showTemplates ? 'Hide' : 'Show'}
               </Button>
@@ -290,7 +290,7 @@ export default function Expenses() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleTemplateSelect(template)}
-                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-blue-50 hover:border-blue-300"
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 soft-button hover:bg-blue-50 hover:border-blue-300/50"
                     >
                       <span className="text-base">{template.icon}</span>
                       <span className="text-xs font-medium">{template.title}</span>
@@ -313,7 +313,7 @@ export default function Expenses() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleTemplateSelect(template)}
-                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-orange-50 hover:border-orange-300"
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 soft-button hover:bg-orange-50 hover:border-orange-300/50"
                     >
                       <span className="text-base">{template.icon}</span>
                       <span className="text-xs font-medium">{template.title}</span>
@@ -336,7 +336,7 @@ export default function Expenses() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleTemplateSelect(template)}
-                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-green-50 hover:border-green-300"
+                      className="h-auto py-2 px-3 flex flex-col items-start gap-1 soft-button hover:bg-green-50 hover:border-green-300/50"
                     >
                       <span className="text-base">{template.icon}</span>
                       <span className="text-xs font-medium">{template.title}</span>
@@ -354,10 +354,10 @@ export default function Expenses() {
         </Card>
 
         {/* Mobile-Optimized Add Expense Form */}
-        <Card className="mb-4 sm:mb-6 shadow-sm">
+        <Card className="mb-4 sm:mb-6 smooth-card fade-in" style={{ animationDelay: '0.2s' }}>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               Add New Expense
             </CardTitle>
           </CardHeader>
@@ -423,7 +423,7 @@ export default function Expenses() {
               <Button
                 type="submit"
                 disabled={isLoading || members.length === 0}
-                className="h-11 sm:h-10 w-full sm:w-auto"
+                className="h-11 sm:h-10 w-full sm:w-auto soft-button bg-gradient-to-br from-primary to-primary/90"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 <span className="text-base sm:text-sm">Add Expense</span>
@@ -439,7 +439,7 @@ export default function Expenses() {
 
         {/* Mobile-Optimized Search and Filter */}
         {expenses.length > 0 && (
-          <Card className="mb-4 sm:mb-6 shadow-sm">
+          <Card className="mb-4 sm:mb-6 smooth-card fade-in" style={{ animationDelay: '0.3s' }}>
             <CardContent className="p-4 sm:pt-6 sm:px-6 sm:pb-6">
               <div className="flex flex-col gap-3">
                 <div className="flex-1">
@@ -493,7 +493,7 @@ export default function Expenses() {
         )}
 
         {/* Mobile-Optimized Expenses List */}
-        <Card className="shadow-sm">
+        <Card className="smooth-card fade-in" style={{ animationDelay: '0.4s' }}>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">Expense History ({filteredExpenses.length})</CardTitle>
           </CardHeader>
@@ -524,12 +524,12 @@ export default function Expenses() {
                 {filteredExpenses.map((expense) => (
                   <div
                     key={expense._id}
-                    className="flex items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors"
+                    className="flex items-center justify-between p-3 sm:p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 active:bg-secondary/60 transition-all active:scale-[0.99]"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-emerald-200">
+                          <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm sm:text-base truncate">{expense.title}</h3>
@@ -540,14 +540,14 @@ export default function Expenses() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4 ml-2 flex-shrink-0">
-                      <span className="text-base sm:text-lg font-bold text-green-600">
+                      <span className="text-base sm:text-lg font-bold text-emerald-600">
                         {formatCurrency(expense.amount)}
                       </span>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteExpense(expense._id, expense.title)}
-                        className="h-9 w-9 sm:h-10 sm:w-10"
+                        className="h-9 w-9 sm:h-10 sm:w-10 hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>

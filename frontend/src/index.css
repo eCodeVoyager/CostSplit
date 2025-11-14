@@ -4,26 +4,47 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Softer, warmer background */
+    --background: 40 20% 99%;
+    --foreground: 20 14.3% 10%;
+
+    /* Card with subtle warmth */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 20 14.3% 10%;
+
+    /* Popover */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 20 14.3% 10%;
+
+    /* Soft indigo primary (less saturated) */
+    --primary: 262 52% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Warm secondary */
+    --secondary: 40 15% 96%;
+    --secondary-foreground: 20 14.3% 10%;
+
+    /* Muted with warmth */
+    --muted: 40 15% 96%;
+    --muted-foreground: 20 8% 46%;
+
+    /* Accent - soft purple */
+    --accent: 262 40% 95%;
+    --accent-foreground: 262 52% 40%;
+
+    /* Softer destructive */
+    --destructive: 0 70% 62%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Warmer borders */
+    --border: 40 20% 92%;
+    --input: 40 20% 92%;
+
+    /* Ring color - softer */
+    --ring: 262 52% 60%;
+
+    /* Larger radius for modern feel */
+    --radius: 0.75rem;
   }
 }
 
@@ -34,5 +55,79 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Smooth Card */
+  .smooth-card {
+    @apply bg-card rounded-lg border border-border/50 shadow-sm;
+    @apply hover:shadow-md hover:border-border;
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Soft Button */
+  .soft-button {
+    @apply transition-all duration-200 ease-out;
+    @apply hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  /* Gradient Background */
+  .gradient-bg {
+    background: linear-gradient(135deg,
+      hsl(var(--background)) 0%,
+      hsl(40 30% 97%) 100%);
+  }
+
+  /* Glass Effect */
+  .glass-effect {
+    @apply bg-white/70 backdrop-blur-sm border border-white/50;
+  }
+
+  /* Smooth Input */
+  .smooth-input {
+    @apply transition-all duration-200;
+    @apply focus:ring-2 focus:ring-primary/20 focus:border-primary/50;
+  }
+
+  /* Loading Shimmer */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  /* Fade In */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

@@ -60,83 +60,112 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-6">
+    <div className="min-h-screen gradient-bg pb-6">
       <div className="container mx-auto px-3 py-4 sm:p-6 max-w-7xl">
         {/* Mobile-Optimized Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-8">
+        <div className="flex items-center justify-between mb-4 sm:mb-8 fade-in">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary rounded-full flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-primary-foreground" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center ring-2 ring-primary/20">
+              <Wallet className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">CostSplit</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                CostSplit
+              </h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Shared Expense Manager</p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleLogout} size="sm" className="h-9">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            size="sm"
+            className="h-9 soft-button hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20"
+          >
             <LogOut className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
 
         {/* Mobile-Optimized Quick Actions */}
-        <div className="grid grid-cols-3 gap-2 mb-4 sm:flex sm:gap-3 sm:mb-6">
-          <Button onClick={() => navigate('/expenses')} size="sm" className="h-11 flex-col sm:flex-row gap-1 sm:gap-2">
+        <div className="grid grid-cols-3 gap-2 mb-4 sm:flex sm:gap-3 sm:mb-6 fade-in" style={{ animationDelay: '0.1s' }}>
+          <Button
+            onClick={() => navigate('/expenses')}
+            size="sm"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button bg-gradient-to-br from-primary to-primary/90"
+          >
             <Plus className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Add Expense</span>
           </Button>
-          <Button onClick={() => navigate('/members')} variant="outline" size="sm" className="h-11 flex-col sm:flex-row gap-1 sm:gap-2">
+          <Button
+            onClick={() => navigate('/members')}
+            variant="outline"
+            size="sm"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button hover:bg-primary/5 hover:border-primary/30"
+          >
             <Users className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Add Member</span>
           </Button>
-          <Button onClick={() => navigate('/balances')} variant="outline" size="sm" className="h-11 flex-col sm:flex-row gap-1 sm:gap-2">
+          <Button
+            onClick={() => navigate('/balances')}
+            variant="outline"
+            size="sm"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button hover:bg-primary/5 hover:border-primary/30"
+          >
             <Scale className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Balances</span>
           </Button>
         </div>
 
         {/* Mobile-Optimized Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-8">
-          <Card className="shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-8 fade-in" style={{ animationDelay: '0.2s' }}>
+          <Card className="smooth-card border-l-4 border-l-blue-400/50 hover:border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Members</CardTitle>
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Members</CardTitle>
+              <div className="p-1.5 bg-blue-50 rounded-lg">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalMembers}</div>
+              <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.totalMembers}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Active members</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="smooth-card border-l-4 border-l-emerald-400/50 hover:border-l-emerald-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Expenses</CardTitle>
-              <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Expenses</CardTitle>
+              <div className="p-1.5 bg-emerald-50 rounded-lg">
+                <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalExpenses}</div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600">{stats.totalExpenses}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Transactions</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="smooth-card border-l-4 border-l-violet-400/50 hover:border-l-violet-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
-              <Scale className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Total</CardTitle>
+              <div className="p-1.5 bg-violet-50 rounded-lg">
+                <Scale className="h-3 w-3 sm:h-4 sm:w-4 text-violet-600" />
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
+              <div className="text-lg sm:text-2xl font-bold text-violet-600">{formatCurrency(stats.totalAmount)}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Total spending</p>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="smooth-card border-l-4 border-l-amber-400/50 hover:border-l-amber-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Average</CardTitle>
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium text-foreground/80">Average</CardTitle>
+              <div className="p-1.5 bg-amber-50 rounded-lg">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
+              </div>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(averageExpense)}</div>
+              <div className="text-lg sm:text-2xl font-bold text-amber-600">{formatCurrency(averageExpense)}</div>
               <p className="text-xs text-muted-foreground hidden sm:block">Per transaction</p>
             </CardContent>
           </Card>
