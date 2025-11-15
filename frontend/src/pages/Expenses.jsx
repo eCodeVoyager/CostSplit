@@ -44,6 +44,7 @@ export default function Expenses() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitPayers, setSplitPayers] = useState([]);
+  const [sharedByMembers, setSharedByMembers] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -60,7 +61,15 @@ export default function Expenses() {
   const fetchMembers = async () => {
     try {
       const response = await membersAPI.getAll();
-      setMembers(response.data);
+      const fetchedMembers = response.data;
+      setMembers(fetchedMembers);
+
+      // Initialize sharedByMembers with all members selected by default
+      setSharedByMembers(fetchedMembers.map(m => ({
+        id: m._id,
+        name: m.name,
+        selected: true,
+      })));
     } catch (error) {
       console.error('Error fetching members:', error);
     }
@@ -141,6 +150,9 @@ export default function Expenses() {
 
     setIsLoading(true);
     try {
+      // Get selected members who share this expense
+      const selectedSharedBy = sharedByMembers.filter(m => m.selected).map(m => m.id);
+
       if (isSplitPayment) {
         // Create single expense with multiple payers using backend's payers array
         const selectedPayers = splitPayers.filter(p => p.selected && parseFloat(p.amount) > 0);
@@ -151,11 +163,15 @@ export default function Expenses() {
             member: payer.id,
             amount: parseFloat(payer.amount),
           })),
+          sharedBy: selectedSharedBy,
           date: formData.date,
         });
       } else {
         // Single payment
-        await expensesAPI.create(formData);
+        await expensesAPI.create({
+          ...formData,
+          sharedBy: selectedSharedBy,
+        });
       }
 
       toast({
@@ -171,6 +187,12 @@ export default function Expenses() {
       });
       setIsSplitPayment(false);
       setSplitPayers([]);
+      // Reset sharedByMembers to all selected
+      setSharedByMembers(members.map(m => ({
+        id: m._id,
+        name: m.name,
+        selected: true,
+      })));
       fetchExpenses();
     } catch (error) {
       toast({
@@ -662,6 +684,48 @@ export default function Expenses() {
                 </div>
               )}
 
+              {/* Shared By Members Selection */}
+              {sharedByMembers.length > 0 && (
+                <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      Who shares this expense?
+                    </Label>
+                    <span className="text-xs text-muted-foreground">
+                      {sharedByMembers.filter(m => m.selected).length} of {sharedByMembers.length} selected
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {sharedByMembers.map((member) => (
+                      <div key={member.id} className="flex items-center gap-2 p-2 bg-card rounded border">
+                        <Checkbox
+                          id={`shared-${member.id}`}
+                          checked={member.selected}
+                          onCheckedChange={() => {
+                            setSharedByMembers(prev =>
+                              prev.map(m =>
+                                m.id === member.id ? { ...m, selected: !m.selected } : m
+                              )
+                            );
+                          }}
+                        />
+                        <label
+                          htmlFor={`shared-${member.id}`}
+                          className="flex-1 text-sm cursor-pointer"
+                        >
+                          {member.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Split cost: ৳{formData.amount && sharedByMembers.filter(m => m.selected).length > 0
+                      ? (parseFloat(formData.amount) / sharedByMembers.filter(m => m.selected).length).toFixed(2)
+                      : '0.00'} per person
+                  </p>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 disabled={isLoading || members.length === 0}
@@ -775,18 +839,25 @@ export default function Expenses() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm sm:text-base truncate">{expense.title}</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             {expense.payers && expense.payers.length > 0 ? (
                               // Split payment - show multiple payers
-                              <>
-                                Split: {expense.payers.map(p => p.member.name).join(', ')} • {formatDate(expense.date)}
-                              </>
+                              <span className="block truncate">
+                                Paid: {expense.payers.map(p => `${p.member.name} (৳${p.amount})`).join(', ')}
+                              </span>
                             ) : (
                               // Single payment
-                              <>
-                                Paid by {expense.paidBy?.name || 'Unknown'} • {formatDate(expense.date)}
-                              </>
+                              <span className="block truncate">
+                                Paid by {expense.paidBy?.name || 'Unknown'}
+                              </span>
                             )}
+                            <span className="block text-xs mt-1">
+                              {expense.sharedBy && expense.sharedBy.length > 0 && expense.sharedBy.length < members.length ? (
+                                <>Shared by: {expense.sharedBy.map(m => m.name).join(', ')} • {formatDate(expense.date)}</>
+                              ) : (
+                                <>{formatDate(expense.date)}</>
+                              )}
+                            </span>
                           </p>
                         </div>
                       </div>

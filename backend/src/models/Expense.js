@@ -39,6 +39,12 @@ const expenseSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Members who share this expense (dynamic selection)
+    sharedBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Member',
+    }],
+    // Backward compatibility: total member count at time of expense
     memberCountAtTime: {
       type: Number,
       required: true,

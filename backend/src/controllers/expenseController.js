@@ -51,6 +51,7 @@ const getAllExpenses = async (req, res) => {
       Expense.find(query)
         .populate('paidBy', 'name')
         .populate('payers.member', 'name')
+        .populate('sharedBy', 'name')
         .sort({ date: -1 })
         .limit(limitNum)
         .skip(skip),
@@ -77,7 +78,7 @@ const getAllExpenses = async (req, res) => {
  */
 const createExpense = async (req, res) => {
   try {
-    const { title, amount, paidBy, payers, date } = req.body;
+    const { title, amount, paidBy, payers, date, sharedBy } = req.body;
 
     // Validation - Title
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -187,11 +188,49 @@ const createExpense = async (req, res) => {
       validatedPaidBy = paidBy;
     }
 
-    // Get current active member count
-    const memberCount = await Member.countDocuments({ isActive: true });
+    // Get current active members
+    const activeMembers = await Member.find({ isActive: true });
+    const memberCount = activeMembers.length;
 
     if (memberCount === 0) {
       return res.status(400).json({ message: 'No active members found. Add members first.' });
+    }
+
+    // Validation - Shared By (which members share this expense)
+    let validatedSharedBy = [];
+
+    if (sharedBy && Array.isArray(sharedBy) && sharedBy.length > 0) {
+      // Validate each member in sharedBy
+      if (sharedBy.length > memberCount) {
+        return res.status(400).json({
+          message: 'Cannot have more members sharing than active members'
+        });
+      }
+
+      // Verify all members exist and are active
+      for (const memberId of sharedBy) {
+        // Validate MongoDB ObjectId format
+        if (!memberId.match(/^[0-9a-fA-F]{24}$/)) {
+          return res.status(400).json({ message: 'Invalid member ID format in sharedBy' });
+        }
+
+        const member = await Member.findById(memberId);
+        if (!member || !member.isActive) {
+          return res.status(400).json({
+            message: `Member ${memberId} in sharedBy not found or inactive`
+          });
+        }
+      }
+
+      // Remove duplicates
+      validatedSharedBy = [...new Set(sharedBy)];
+
+      if (validatedSharedBy.length === 0) {
+        return res.status(400).json({ message: 'At least one member must share the expense' });
+      }
+    } else {
+      // Default: all active members share the expense
+      validatedSharedBy = activeMembers.map(m => m._id.toString());
     }
 
     // Validation - Date (optional)
@@ -230,6 +269,7 @@ const createExpense = async (req, res) => {
       amount: roundedAmount,
       date: expenseDate,
       memberCountAtTime: memberCount,
+      sharedBy: validatedSharedBy,
     };
 
     // Add either payers or paidBy
@@ -242,12 +282,13 @@ const createExpense = async (req, res) => {
     const expense = new Expense(expenseData);
     await expense.save();
 
-    // Populate payers or paidBy before sending response
+    // Populate payers or paidBy and sharedBy before sending response
     if (validatedPayers) {
       await expense.populate('payers.member', 'name');
     } else {
       await expense.populate('paidBy', 'name');
     }
+    await expense.populate('sharedBy', 'name');
 
     res.status(201).json(expense);
   } catch (error) {

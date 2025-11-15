@@ -22,8 +22,14 @@ const calculateBalances = (members, expenses, completedSettlements = []) => {
       return;
     }
 
-    const totalMembers = expense.memberCountAtTime;
-    const sharePerPerson = expense.amount / totalMembers;
+    // Determine which members share this expense
+    // Use sharedBy if available, otherwise fall back to all members (backward compatibility)
+    const membersWhoShare = expense.sharedBy && expense.sharedBy.length > 0
+      ? expense.sharedBy
+      : members.map(m => m._id);
+
+    const totalSharingMembers = membersWhoShare.length;
+    const sharePerPerson = expense.amount / totalSharingMembers;
 
     // Handle multi-payer expenses
     if (expense.payers && expense.payers.length > 0) {
@@ -42,9 +48,9 @@ const calculateBalances = (members, expenses, completedSettlements = []) => {
       }
     }
 
-    // Everyone (including payer(s)) gets debited their share
-    members.forEach((member) => {
-      const memberId = member._id.toString();
+    // Only members who share this expense get debited
+    membersWhoShare.forEach((memberRef) => {
+      const memberId = memberRef._id ? memberRef._id.toString() : memberRef.toString();
       if (balances[memberId]) {
         balances[memberId].balance -= sharePerPerson;
       }
