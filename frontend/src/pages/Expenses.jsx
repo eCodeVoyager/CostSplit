@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { useToast } from '../components/ui/use-toast';
-import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter, Zap, Bus, UtensilsCrossed, ShoppingBag, Users2 } from 'lucide-react';
+import { ArrowLeft, Plus, Receipt, Trash2, Search, Download, Filter, Zap, Bus, UtensilsCrossed, ShoppingBag, Users2, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Preset expense templates for quick adding
 const EXPENSE_TEMPLATES = {
@@ -45,6 +45,7 @@ export default function Expenses() {
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitPayers, setSplitPayers] = useState([]);
   const [sharedByMembers, setSharedByMembers] = useState([]);
+  const [showSharedBySection, setShowSharedBySection] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -237,12 +238,12 @@ export default function Expenses() {
       }
 
       // Initialize split payers when enabling split mode
-      // Don't pre-fill amounts until user enters total amount
+      // All members selected by default
       setSplitPayers(
         members.map(member => ({
           id: member._id,
           name: member.name,
-          selected: false,
+          selected: true,
           amount: '0',
         }))
       );
@@ -630,33 +631,30 @@ export default function Expenses() {
 
               {/* Split Payment Mode */}
               {isSplitPayment && (
-                <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-3 p-3 sm:p-4 bg-muted/30 rounded-lg border">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <Label className="text-sm font-semibold">Who paid?</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAutoSplit}
-                      className="h-8 text-xs"
-                    >
-                      Auto Split
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {splitPayers.filter(p => p.selected).length} selected
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAutoSplit}
+                        className="h-8 text-xs"
+                      >
+                        Auto Split
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {splitPayers.map((payer) => (
-                      <div key={payer.id} className="flex items-center gap-3 p-2 bg-card rounded border">
-                        <Checkbox
-                          id={`payer-${payer.id}`}
-                          checked={payer.selected}
-                          onCheckedChange={() => handleSplitPayerToggle(payer.id)}
-                        />
-                        <label
-                          htmlFor={`payer-${payer.id}`}
-                          className="flex-1 text-sm font-medium cursor-pointer"
-                        >
-                          {payer.name}
-                        </label>
+
+                  {/* Selected Payers - Amount Input */}
+                  <div className="space-y-2">
+                    {splitPayers.filter(p => p.selected).map((payer) => (
+                      <div key={payer.id} className="flex items-center gap-2 p-2 sm:p-3 bg-card rounded border">
+                        <span className="flex-1 text-sm font-medium truncate">{payer.name}</span>
                         <Input
                           type="number"
                           step="0.01"
@@ -664,16 +662,53 @@ export default function Expenses() {
                           placeholder="0.00"
                           value={payer.amount}
                           onChange={(e) => handleSplitAmountChange(payer.id, e.target.value)}
-                          disabled={!payer.selected || isLoading}
-                          className="w-24 h-8 text-sm"
+                          disabled={isLoading}
+                          className="w-20 sm:w-24 h-9 sm:h-8 text-sm"
                         />
+                        <button
+                          type="button"
+                          onClick={() => handleSplitPayerToggle(payer.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                          title="Remove payer"
+                        >
+                          <span className="text-lg leading-none">×</span>
+                        </button>
                       </div>
                     ))}
                   </div>
+
+                  {/* Unselected Payers - Checkbox to Add */}
+                  {splitPayers.filter(p => !p.selected).length > 0 && (
+                    <details className="group">
+                      <summary className="cursor-pointer list-none flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        <span>Add more payers ({splitPayers.filter(p => !p.selected).length})</span>
+                        <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
+                      </summary>
+                      <div className="mt-2 space-y-1 pl-2 border-l-2 border-muted">
+                        {splitPayers.filter(p => !p.selected).map((payer) => (
+                          <div key={payer.id} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded">
+                            <Checkbox
+                              id={`payer-add-${payer.id}`}
+                              checked={false}
+                              onCheckedChange={() => handleSplitPayerToggle(payer.id)}
+                            />
+                            <label
+                              htmlFor={`payer-add-${payer.id}`}
+                              className="flex-1 text-sm cursor-pointer"
+                            >
+                              {payer.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Total Display */}
                   {splitPayers.length > 0 && (
-                    <div className="flex justify-between text-sm pt-2 border-t">
+                    <div className="flex justify-between items-center text-sm pt-2 border-t">
                       <span className="font-medium">Total Paid:</span>
-                      <span className="font-bold">
+                      <span className="text-base font-bold">
                         ৳{splitPayers
                           .filter(p => p.selected)
                           .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
@@ -684,45 +719,82 @@ export default function Expenses() {
                 </div>
               )}
 
-              {/* Shared By Members Selection */}
+              {/* Shared By Members Selection - Collapsible */}
               {sharedByMembers.length > 0 && (
-                <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                      Who shares this expense?
-                    </Label>
-                    <span className="text-xs text-muted-foreground">
-                      {sharedByMembers.filter(m => m.selected).length} of {sharedByMembers.length} selected
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {sharedByMembers.map((member) => (
-                      <div key={member.id} className="flex items-center gap-2 p-2 bg-card rounded border">
-                        <Checkbox
-                          id={`shared-${member.id}`}
-                          checked={member.selected}
-                          onCheckedChange={() => {
-                            setSharedByMembers(prev =>
-                              prev.map(m =>
-                                m.id === member.id ? { ...m, selected: !m.selected } : m
-                              )
-                            );
-                          }}
-                        />
-                        <label
-                          htmlFor={`shared-${member.id}`}
-                          className="flex-1 text-sm cursor-pointer"
-                        >
-                          {member.name}
-                        </label>
+                <div className="rounded-lg border border-blue-200 dark:border-blue-800 overflow-hidden">
+                  {/* Header - Always Visible */}
+                  <button
+                    type="button"
+                    onClick={() => setShowSharedBySection(!showSharedBySection)}
+                    className="w-full flex items-center justify-between p-3 sm:p-4 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100 cursor-pointer">
+                        Who shares this expense?
+                      </Label>
+                      {!showSharedBySection && sharedByMembers.filter(m => m.selected).length === sharedByMembers.length && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                          (All {sharedByMembers.length})
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!showSharedBySection && (
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
+                          {sharedByMembers.filter(m => m.selected).length === sharedByMembers.length
+                            ? `All members • ৳${formData.amount && sharedByMembers.filter(m => m.selected).length > 0
+                                ? (parseFloat(formData.amount) / sharedByMembers.filter(m => m.selected).length).toFixed(2)
+                                : '0.00'} each`
+                            : `${sharedByMembers.filter(m => m.selected).length} of ${sharedByMembers.length}`
+                          }
+                        </span>
+                      )}
+                      {showSharedBySection ? (
+                        <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Expandable Content */}
+                  {showSharedBySection && (
+                    <div className="p-3 sm:p-4 space-y-3 bg-white dark:bg-slate-950 border-t border-blue-200 dark:border-blue-800">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {sharedByMembers.map((member) => (
+                          <div key={member.id} className="flex items-center gap-2 p-2 sm:p-2.5 bg-muted/30 hover:bg-muted/50 rounded border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                            <Checkbox
+                              id={`shared-${member.id}`}
+                              checked={member.selected}
+                              onCheckedChange={() => {
+                                setSharedByMembers(prev =>
+                                  prev.map(m =>
+                                    m.id === member.id ? { ...m, selected: !m.selected } : m
+                                  )
+                                );
+                              }}
+                            />
+                            <label
+                              htmlFor={`shared-${member.id}`}
+                              className="flex-1 text-sm cursor-pointer"
+                            >
+                              {member.name}
+                            </label>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Split cost: ৳{formData.amount && sharedByMembers.filter(m => m.selected).length > 0
-                      ? (parseFloat(formData.amount) / sharedByMembers.filter(m => m.selected).length).toFixed(2)
-                      : '0.00'} per person
-                  </p>
+                      <div className="flex items-center justify-between text-xs pt-2 border-t">
+                        <span className="text-muted-foreground">
+                          {sharedByMembers.filter(m => m.selected).length} of {sharedByMembers.length} selected
+                        </span>
+                        <span className="font-medium">
+                          ৳{formData.amount && sharedByMembers.filter(m => m.selected).length > 0
+                            ? (parseFloat(formData.amount) / sharedByMembers.filter(m => m.selected).length).toFixed(2)
+                            : '0.00'} per person
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
