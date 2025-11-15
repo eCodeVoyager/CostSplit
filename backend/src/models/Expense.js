@@ -44,6 +44,20 @@ const expenseSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Member',
     }],
+    // Custom shares per person (for unequal splitting)
+    // If not provided, expense is split equally among sharedBy members
+    customShares: [{
+      member: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Member',
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+        min: [0.01, 'Share amount must be greater than 0'],
+      },
+    }],
     // Backward compatibility: total member count at time of expense
     memberCountAtTime: {
       type: Number,
@@ -65,6 +79,7 @@ const expenseSchema = new mongoose.Schema(
 
 // Indexes for faster queries
 expenseSchema.index({ date: -1 });
+expenseSchema.index({ createdAt: -1 });
 expenseSchema.index({ paidBy: 1 });
 
 module.exports = mongoose.model('Expense', expenseSchema);

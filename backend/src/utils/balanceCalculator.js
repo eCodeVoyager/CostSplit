@@ -22,16 +22,7 @@ const calculateBalances = (members, expenses, completedSettlements = []) => {
       return;
     }
 
-    // Determine which members share this expense
-    // Use sharedBy if available, otherwise fall back to all members (backward compatibility)
-    const membersWhoShare = expense.sharedBy && expense.sharedBy.length > 0
-      ? expense.sharedBy
-      : members.map(m => m._id);
-
-    const totalSharingMembers = membersWhoShare.length;
-    const sharePerPerson = expense.amount / totalSharingMembers;
-
-    // Handle multi-payer expenses
+    // Handle multi-payer expenses (credit payers first)
     if (expense.payers && expense.payers.length > 0) {
       // Multi-payer: each payer gets credited their paid amount
       expense.payers.forEach((payer) => {
@@ -48,13 +39,34 @@ const calculateBalances = (members, expenses, completedSettlements = []) => {
       }
     }
 
-    // Only members who share this expense get debited
-    membersWhoShare.forEach((memberRef) => {
-      const memberId = memberRef._id ? memberRef._id.toString() : memberRef.toString();
-      if (balances[memberId]) {
-        balances[memberId].balance -= sharePerPerson;
-      }
-    });
+    // Debit members based on their share
+    // If customShares are provided, use them; otherwise split equally
+    if (expense.customShares && expense.customShares.length > 0) {
+      // Custom shares: each member pays their specific amount
+      expense.customShares.forEach((share) => {
+        const memberId = share.member._id ? share.member._id.toString() : share.member.toString();
+        if (balances[memberId]) {
+          balances[memberId].balance -= share.amount;
+        }
+      });
+    } else {
+      // Equal split: determine which members share this expense
+      // Use sharedBy if available, otherwise fall back to all members (backward compatibility)
+      const membersWhoShare = expense.sharedBy && expense.sharedBy.length > 0
+        ? expense.sharedBy
+        : members.map(m => m._id);
+
+      const totalSharingMembers = membersWhoShare.length;
+      const sharePerPerson = expense.amount / totalSharingMembers;
+
+      // Only members who share this expense get debited equally
+      membersWhoShare.forEach((memberRef) => {
+        const memberId = memberRef._id ? memberRef._id.toString() : memberRef.toString();
+        if (balances[memberId]) {
+          balances[memberId].balance -= sharePerPerson;
+        }
+      });
+    }
   });
 
   // Apply completed settlements (adjust balances)
