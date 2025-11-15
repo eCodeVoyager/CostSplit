@@ -868,15 +868,26 @@ export default function Expenses() {
                     </details>
                   )}
 
-                  {/* Total Display */}
+                  {/* Total Display with validation feedback */}
                   {splitPayers.length > 0 && (
                     <div className="flex justify-between items-center text-sm pt-2 border-t">
                       <span className="font-medium">Total Paid:</span>
-                      <span className="text-base font-bold">
+                      <span className={`text-base font-bold ${
+                        formData.amount && Math.abs(
+                          splitPayers.filter(p => p.selected).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) - parseFloat(formData.amount)
+                        ) > 0.01
+                          ? 'text-destructive'
+                          : 'text-foreground'
+                      }`}>
                         ৳{splitPayers
                           .filter(p => p.selected)
                           .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0)
                           .toFixed(2)}
+                        {formData.amount && (
+                          <span className="text-xs ml-2 text-muted-foreground">
+                            / ৳{parseFloat(formData.amount).toFixed(2)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}
@@ -885,9 +896,9 @@ export default function Expenses() {
 
               {/* Custom Cost Shares Mode */}
               {isCustomShares && (
-                <div className="space-y-3 p-3 sm:p-4 bg-orange-50/50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                <div className="space-y-3 p-3 sm:p-4 bg-violet-50/50 dark:bg-violet-950/20 rounded-lg border border-violet-200 dark:border-violet-800">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <Label className="text-sm font-semibold text-orange-900 dark:text-orange-100">Custom cost per person</Label>
+                    <Label className="text-sm font-semibold text-violet-900 dark:text-violet-100">Custom cost per person</Label>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         {customShares.filter(s => s.selected).length} selected
@@ -958,15 +969,26 @@ export default function Expenses() {
                     </details>
                   )}
 
-                  {/* Total Display */}
+                  {/* Total Display with validation feedback */}
                   {customShares.length > 0 && (
                     <div className="flex justify-between items-center text-sm pt-2 border-t">
                       <span className="font-medium">Total Cost:</span>
-                      <span className="text-base font-bold">
+                      <span className={`text-base font-bold ${
+                        formData.amount && Math.abs(
+                          customShares.filter(s => s.selected).reduce((sum, s) => sum + parseFloat(s.amount || 0), 0) - parseFloat(formData.amount)
+                        ) > 0.01
+                          ? 'text-destructive'
+                          : 'text-foreground'
+                      }`}>
                         ৳{customShares
                           .filter(s => s.selected)
                           .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0)
                           .toFixed(2)}
+                        {formData.amount && (
+                          <span className="text-xs ml-2 text-muted-foreground">
+                            / ৳{parseFloat(formData.amount).toFixed(2)}
+                          </span>
+                        )}
                       </span>
                     </div>
                   )}
