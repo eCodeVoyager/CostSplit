@@ -17,7 +17,7 @@ const sanitizeInput = (input) => {
  */
 const getAllExpenses = async (req, res) => {
   try {
-    const { startDate, endDate, limit, page = 1 } = req.query;
+    const { startDate, endDate, limit, page = 1, sortBy = 'date' } = req.query;
 
     let query = {};
 
@@ -42,6 +42,14 @@ const getAllExpenses = async (req, res) => {
       }
     }
 
+    // Sorting - default by date (expense date), or by createdAt (when expense was created)
+    let sortField = {};
+    if (sortBy === 'createdAt') {
+      sortField = { createdAt: -1 }; // Most recent created first
+    } else {
+      sortField = { date: -1 }; // Most recent expense date first (default)
+    }
+
     // Pagination
     const pageNum = parseInt(page) || 1;
     const limitNum = Math.min(parseInt(limit) || 100, 1000); // Max 1000 per page
@@ -52,7 +60,8 @@ const getAllExpenses = async (req, res) => {
         .populate('paidBy', 'name')
         .populate('payers.member', 'name')
         .populate('sharedBy', 'name')
-        .sort({ date: -1 })
+        .populate('customShares.member', 'name')
+        .sort(sortField)
         .limit(limitNum)
         .skip(skip),
       Expense.countDocuments(query)
@@ -78,7 +87,7 @@ const getAllExpenses = async (req, res) => {
  */
 const createExpense = async (req, res) => {
   try {
-    const { title, amount, paidBy, payers, date, sharedBy } = req.body;
+    const { title, amount, paidBy, payers, date, sharedBy, customShares } = req.body;
 
     // Validation - Title
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -196,10 +205,78 @@ const createExpense = async (req, res) => {
       return res.status(400).json({ message: 'No active members found. Add members first.' });
     }
 
+    // Validation - Custom Shares (per-person cost amounts)
+    let validatedCustomShares = null;
+
+    if (customShares && Array.isArray(customShares) && customShares.length > 0) {
+      // Validate each custom share
+      if (customShares.length > memberCount) {
+        return res.status(400).json({
+          message: 'Cannot have more custom shares than active members'
+        });
+      }
+
+      const sharePromises = customShares.map(async (share) => {
+        if (!share.member || !share.amount) {
+          throw new Error('Each custom share must have member and amount');
+        }
+
+        // Validate MongoDB ObjectId format
+        if (!share.member.match(/^[0-9a-fA-F]{24}$/)) {
+          throw new Error('Invalid member ID format in customShares');
+        }
+
+        const shareAmount = parseFloat(share.amount);
+        if (isNaN(shareAmount) || shareAmount <= 0) {
+          throw new Error('Each custom share amount must be greater than 0');
+        }
+
+        // Verify member exists and is active
+        const member = await Member.findById(share.member);
+        if (!member || !member.isActive) {
+          throw new Error(`Member ${share.member} in customShares not found or inactive`);
+        }
+
+        return {
+          member: share.member,
+          amount: Math.round(shareAmount * 100) / 100,
+        };
+      });
+
+      try {
+        validatedCustomShares = await Promise.all(sharePromises);
+
+        // Verify total custom shares equal expense amount
+        const totalShares = validatedCustomShares.reduce((sum, s) => sum + s.amount, 0);
+        if (Math.abs(totalShares - roundedAmount) > 0.01) {
+          return res.status(400).json({
+            message: `Total custom shares (${totalShares}) must equal expense amount (${roundedAmount})`
+          });
+        }
+
+        // Remove duplicates by member ID
+        const uniqueMemberIds = new Set();
+        validatedCustomShares = validatedCustomShares.filter(share => {
+          const memberId = share.member.toString();
+          if (uniqueMemberIds.has(memberId)) {
+            return false;
+          }
+          uniqueMemberIds.add(memberId);
+          return true;
+        });
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
+      }
+    }
+
     // Validation - Shared By (which members share this expense)
+    // Note: If customShares is provided, sharedBy is derived from it
     let validatedSharedBy = [];
 
-    if (sharedBy && Array.isArray(sharedBy) && sharedBy.length > 0) {
+    if (validatedCustomShares) {
+      // Derive sharedBy from customShares
+      validatedSharedBy = validatedCustomShares.map(s => s.member.toString());
+    } else if (sharedBy && Array.isArray(sharedBy) && sharedBy.length > 0) {
       // Validate each member in sharedBy
       if (sharedBy.length > memberCount) {
         return res.status(400).json({
@@ -279,16 +356,24 @@ const createExpense = async (req, res) => {
       expenseData.paidBy = validatedPaidBy;
     }
 
+    // Add customShares if provided
+    if (validatedCustomShares) {
+      expenseData.customShares = validatedCustomShares;
+    }
+
     const expense = new Expense(expenseData);
     await expense.save();
 
-    // Populate payers or paidBy and sharedBy before sending response
+    // Populate payers or paidBy, sharedBy, and customShares before sending response
     if (validatedPayers) {
       await expense.populate('payers.member', 'name');
     } else {
       await expense.populate('paidBy', 'name');
     }
     await expense.populate('sharedBy', 'name');
+    if (validatedCustomShares) {
+      await expense.populate('customShares.member', 'name');
+    }
 
     res.status(201).json(expense);
   } catch (error) {

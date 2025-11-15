@@ -41,9 +41,13 @@ export default function Expenses() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [isCustomShares, setIsCustomShares] = useState(false);
   const [splitPayers, setSplitPayers] = useState([]);
+  const [customShares, setCustomShares] = useState([]);
   const [sharedByMembers, setSharedByMembers] = useState([]);
   const [showSharedBySection, setShowSharedBySection] = useState(false);
   const [formData, setFormData] = useState({
@@ -58,6 +62,13 @@ export default function Expenses() {
     fetchMembers();
     fetchExpenses();
   }, []);
+
+  // Refetch expenses when date filter or custom dates change
+  useEffect(() => {
+    if (dateFilter === 'custom') {
+      fetchExpenses();
+    }
+  }, [startDate, endDate, dateFilter]);
 
   const fetchMembers = async () => {
     try {
@@ -78,7 +89,18 @@ export default function Expenses() {
 
   const fetchExpenses = async () => {
     try {
-      const response = await expensesAPI.getAll();
+      // Build query parameters for date filtering and sorting
+      const params = {
+        sortBy: 'createdAt', // Sort by most recently created
+      };
+
+      // Add date range if custom dates are selected
+      if (dateFilter === 'custom' && (startDate || endDate)) {
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+      }
+
+      const response = await expensesAPI.getAll(params);
       // Handle both old and new pagination format
       const expenseData = response.data.expenses || response.data;
       setExpenses(expenseData);
@@ -149,31 +171,63 @@ export default function Expenses() {
       }
     }
 
+    // Validation for custom shares
+    if (isCustomShares) {
+      const selectedShares = customShares.filter(s => s.selected && parseFloat(s.amount || 0) > 0);
+      if (selectedShares.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Please select at least one member with a valid cost share',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const totalShares = selectedShares.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
+      const totalAmount = parseFloat(formData.amount);
+
+      if (Math.abs(totalShares - totalAmount) > 0.01) {
+        toast({
+          title: 'Error',
+          description: `Total cost shares (৳${totalShares.toFixed(2)}) must equal expense amount (৳${totalAmount})`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
-      // Get selected members who share this expense
-      const selectedSharedBy = sharedByMembers.filter(m => m.selected).map(m => m.id);
+      const expensePayload = {
+        title: formData.title,
+        amount: parseFloat(formData.amount),
+        date: formData.date,
+      };
 
+      // Add payer(s)
       if (isSplitPayment) {
-        // Create single expense with multiple payers using backend's payers array
         const selectedPayers = splitPayers.filter(p => p.selected && parseFloat(p.amount) > 0);
-        await expensesAPI.create({
-          title: formData.title,
-          amount: parseFloat(formData.amount),
-          payers: selectedPayers.map(payer => ({
-            member: payer.id,
-            amount: parseFloat(payer.amount),
-          })),
-          sharedBy: selectedSharedBy,
-          date: formData.date,
-        });
+        expensePayload.payers = selectedPayers.map(payer => ({
+          member: payer.id,
+          amount: parseFloat(payer.amount),
+        }));
       } else {
-        // Single payment
-        await expensesAPI.create({
-          ...formData,
-          sharedBy: selectedSharedBy,
-        });
+        expensePayload.paidBy = formData.paidBy;
       }
+
+      // Add custom shares or sharedBy
+      if (isCustomShares) {
+        const selectedShares = customShares.filter(s => s.selected && parseFloat(s.amount) > 0);
+        expensePayload.customShares = selectedShares.map(share => ({
+          member: share.id,
+          amount: parseFloat(share.amount),
+        }));
+      } else {
+        const selectedSharedBy = sharedByMembers.filter(m => m.selected).map(m => m.id);
+        expensePayload.sharedBy = selectedSharedBy;
+      }
+
+      await expensesAPI.create(expensePayload);
 
       toast({
         title: 'Success',
@@ -187,7 +241,9 @@ export default function Expenses() {
         date: new Date().toISOString().split('T')[0],
       });
       setIsSplitPayment(false);
+      setIsCustomShares(false);
       setSplitPayers([]);
+      setCustomShares([]);
       // Reset sharedByMembers to all selected
       setSharedByMembers(members.map(m => ({
         id: m._id,
@@ -313,6 +369,101 @@ export default function Expenses() {
           return { ...payer, amount };
         }
         return payer;
+      })
+    );
+  };
+
+  // Custom shares handlers
+  const handleCustomSharesToggle = () => {
+    const newCustomMode = !isCustomShares;
+    setIsCustomShares(newCustomMode);
+
+    if (newCustomMode) {
+      // Check if members exist
+      if (members.length === 0) {
+        toast({
+          title: 'No members',
+          description: 'Please add members before using custom shares',
+          variant: 'destructive',
+        });
+        setIsCustomShares(false);
+        return;
+      }
+
+      // Initialize custom shares when enabling custom mode
+      // All members selected by default with 0 amount
+      setCustomShares(
+        members.map(member => ({
+          id: member._id,
+          name: member.name,
+          selected: true,
+          amount: '0',
+        }))
+      );
+      // Disable sharedBy section when using custom shares
+      setShowSharedBySection(false);
+    } else {
+      setCustomShares([]);
+    }
+  };
+
+  const handleCustomShareToggle = (memberId) => {
+    setCustomShares(prev =>
+      prev.map(share =>
+        share.id === memberId ? { ...share, selected: !share.selected } : share
+      )
+    );
+  };
+
+  const handleCustomShareAmountChange = (memberId, amount) => {
+    const numAmount = parseFloat(amount);
+    if (amount !== '' && (isNaN(numAmount) || numAmount < 0)) {
+      return; // Ignore invalid input
+    }
+
+    setCustomShares(prev =>
+      prev.map(share =>
+        share.id === memberId ? { ...share, amount: amount } : share
+      )
+    );
+  };
+
+  const handleAutoSplitShares = () => {
+    const totalAmount = parseFloat(formData.amount) || 0;
+    if (totalAmount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Please enter a valid total amount first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const selectedCount = customShares.filter(s => s.selected).length;
+    if (selectedCount === 0) {
+      toast({
+        title: 'No members selected',
+        description: 'Please select members first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Calculate per-person amount with proper rounding
+    const perPerson = (totalAmount / selectedCount).toFixed(2);
+    const remainder = (totalAmount - (parseFloat(perPerson) * selectedCount)).toFixed(2);
+    let isFirst = true;
+
+    setCustomShares(prev =>
+      prev.map(share => {
+        if (share.selected) {
+          const amount = isFirst && parseFloat(remainder) !== 0
+            ? (parseFloat(perPerson) + parseFloat(remainder)).toFixed(2)
+            : perPerson;
+          isFirst = false;
+          return { ...share, amount };
+        }
+        return share;
       })
     );
   };
@@ -546,22 +697,35 @@ export default function Expenses() {
         {/* Add Expense Form */}
         <Card className="mb-6 smooth-card">
           <CardHeader className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Plus className="w-5 h-5" />
                 Add New Expense
               </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSplitPaymentToggle}
-                disabled={members.length === 0}
-                className="soft-button"
-              >
-                <Users2 className="w-4 h-4 mr-2" />
-                {isSplitPayment ? 'Single' : 'Split'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSplitPaymentToggle}
+                  disabled={members.length === 0}
+                  className="soft-button"
+                >
+                  <Users2 className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">{isSplitPayment ? 'Single' : 'Split'}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={isCustomShares ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleCustomSharesToggle}
+                  disabled={members.length === 0}
+                  className="soft-button"
+                  title="Custom cost per person"
+                >
+                  <span className="text-xs sm:text-sm">Custom</span>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
@@ -719,8 +883,98 @@ export default function Expenses() {
                 </div>
               )}
 
+              {/* Custom Cost Shares Mode */}
+              {isCustomShares && (
+                <div className="space-y-3 p-3 sm:p-4 bg-orange-50/50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <Label className="text-sm font-semibold text-orange-900 dark:text-orange-100">Custom cost per person</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {customShares.filter(s => s.selected).length} selected
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAutoSplitShares}
+                        className="h-8 text-xs"
+                      >
+                        Equal Split
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Selected Members - Amount Input */}
+                  <div className="space-y-2">
+                    {customShares.filter(s => s.selected).map((share) => (
+                      <div key={share.id} className="flex items-center gap-2 p-2 sm:p-3 bg-card rounded border">
+                        <span className="flex-1 text-sm font-medium truncate">{share.name}</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={share.amount}
+                          onChange={(e) => handleCustomShareAmountChange(share.id, e.target.value)}
+                          disabled={isLoading}
+                          className="w-20 sm:w-24 h-9 sm:h-8 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleCustomShareToggle(share.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                          title="Remove member"
+                        >
+                          <span className="text-lg leading-none">×</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Unselected Members - Checkbox to Add */}
+                  {customShares.filter(s => !s.selected).length > 0 && (
+                    <details className="group">
+                      <summary className="cursor-pointer list-none flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        <span>Add more members ({customShares.filter(s => !s.selected).length})</span>
+                        <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
+                      </summary>
+                      <div className="mt-2 space-y-1 pl-2 border-l-2 border-muted">
+                        {customShares.filter(s => !s.selected).map((share) => (
+                          <div key={share.id} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded">
+                            <Checkbox
+                              id={`share-add-${share.id}`}
+                              checked={false}
+                              onCheckedChange={() => handleCustomShareToggle(share.id)}
+                            />
+                            <label
+                              htmlFor={`share-add-${share.id}`}
+                              className="flex-1 text-sm cursor-pointer"
+                            >
+                              {share.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Total Display */}
+                  {customShares.length > 0 && (
+                    <div className="flex justify-between items-center text-sm pt-2 border-t">
+                      <span className="font-medium">Total Cost:</span>
+                      <span className="text-base font-bold">
+                        ৳{customShares
+                          .filter(s => s.selected)
+                          .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0)
+                          .toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Shared By Members Selection - Collapsible */}
-              {sharedByMembers.length > 0 && (
+              {!isCustomShares && sharedByMembers.length > 0 && (
                 <div className="rounded-lg border border-blue-200 dark:border-blue-800 overflow-hidden">
                   {/* Header - Always Visible */}
                   <button
@@ -831,7 +1085,7 @@ export default function Expenses() {
                     />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={dateFilter} onValueChange={setDateFilter}>
                     <SelectTrigger className="flex-1 sm:flex-none sm:w-[150px] h-11 sm:h-10">
                       <Filter className="w-4 h-4 mr-2" />
@@ -842,8 +1096,27 @@ export default function Expenses() {
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="custom">Custom Range</SelectItem>
                     </SelectContent>
                   </Select>
+                  {dateFilter === 'custom' && (
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        placeholder="Start date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-11 sm:h-10 w-full sm:w-auto"
+                      />
+                      <Input
+                        type="date"
+                        placeholder="End date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="h-11 sm:h-10 w-full sm:w-auto"
+                      />
+                    </div>
+                  )}
                   <Button variant="outline" onClick={handleExportCSV} className="h-11 sm:h-10">
                     <Download className="w-4 h-4 sm:mr-2" />
                     <span className="hidden sm:inline">Export CSV</span>
@@ -859,6 +1132,8 @@ export default function Expenses() {
                     onClick={() => {
                       setSearchQuery('');
                       setDateFilter('all');
+                      setStartDate('');
+                      setEndDate('');
                     }}
                     className="h-8 w-fit"
                   >
@@ -886,6 +1161,8 @@ export default function Expenses() {
                   onClick={() => {
                     setSearchQuery('');
                     setDateFilter('all');
+                    setStartDate('');
+                    setEndDate('');
                   }}
                   className="mt-2 text-xs sm:text-sm"
                 >
