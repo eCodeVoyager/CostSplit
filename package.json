@@ -10,9 +10,23 @@
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",
     "test": "npm run test:backend && npm run test:frontend",
-    "build": "cd frontend && npm run build"
+    "build": "cd frontend && npm run build",
+    "pm2:start": "cd backend && pm2 start server.js --name costsplit-backend",
+    "pm2:stop": "pm2 stop costsplit-backend",
+    "pm2:restart": "pm2 restart costsplit-backend",
+    "pm2:delete": "pm2 delete costsplit-backend",
+    "pm2:logs": "pm2 logs costsplit-backend",
+    "pm2:monit": "pm2 monit",
+    "pm2:status": "pm2 status"
   },
-  "keywords": ["expense", "splitter", "MERN", "react", "mongodb", "express"],
+  "keywords": [
+    "expense",
+    "splitter",
+    "MERN",
+    "react",
+    "mongodb",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
