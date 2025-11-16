@@ -36,7 +36,7 @@ app.use(
 const corsOptions = {
   origin: [
     "http://localhost:3000",
-    "http://localhost:5173",
+    "https://cost-split.vercel.app",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://152.42.183.209:3000",
