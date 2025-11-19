@@ -1445,16 +1445,28 @@ export default function Expenses() {
                               </span>
                             )}
                             <span className="block text-xs mt-1">
-                              {expense.sharedBy &&
-                              expense.sharedBy.length > 0 &&
-                              expense.sharedBy.length < members.length ? (
+                              {expense.customShares && expense.customShares.length > 0 ? (
                                 <>
-                                  Shared by:{" "}
-                                  {expense.sharedBy
-                                    .map((m) => m.name)
-                                    .join(", ")}{" "}
-                                  • {formatDate(expense.date)}
+                                  <span className="text-violet-600 dark:text-violet-400">Custom shares</span>
+                                  {" • "}
+                                  {formatDate(expense.date)}
                                 </>
+                              ) : expense.sharedBy && expense.sharedBy.length > 0 ? (
+                                expense.sharedBy.length === members.length ? (
+                                  <>
+                                    <span className="text-primary">Shared by all</span>
+                                    {" • "}
+                                    {formatDate(expense.date)}
+                                  </>
+                                ) : (
+                                  <>
+                                    Shared by:{" "}
+                                    {expense.sharedBy
+                                      .map((m) => m.name)
+                                      .join(", ")}{" "}
+                                    • {formatDate(expense.date)}
+                                  </>
+                                )
                               ) : (
                                 <>{formatDate(expense.date)}</>
                               )}
