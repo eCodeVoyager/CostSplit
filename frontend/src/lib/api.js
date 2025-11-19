@@ -51,6 +51,7 @@ export const expensesAPI = {
   toggleSettled: (id, settled) => api.patch(`/expenses/${id}/settle`, { settled }),
   delete: (id) => api.delete(`/expenses/${id}`),
   getStats: () => api.get('/expenses/stats'),
+  getAnalytics: (params) => api.get('/expenses/analytics', { params }),
 };
 
 // Balances API

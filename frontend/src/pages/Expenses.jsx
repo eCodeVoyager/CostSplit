@@ -990,7 +990,7 @@ export default function Expenses() {
                               />
                               <label
                                 htmlFor={`payer-add-${payer.id}`}
-                                className="flex-1 text-sm cursor-pointer text-foreground dark:text-slate-200"
+                                className="flex-1 text-sm cursor-pointer text-foreground"
                               >
                                 {payer.name}
                               </label>
@@ -1177,28 +1177,28 @@ export default function Expenses() {
 
               {/* Shared By Members Selection - Collapsible */}
               {!isCustomShares && sharedByMembers.length > 0 && (
-                <div className="rounded-lg border border-blue-200 overflow-hidden bg-white">
+                <div className="rounded-lg border overflow-hidden bg-card">
                   {/* Header - Always Visible */}
                   <button
                     type="button"
                     onClick={() => setShowSharedBySection(!showSharedBySection)}
-                    className="w-full flex items-center justify-between p-3 sm:p-4 bg-blue-50/50 hover:bg-blue-100/50 transition-colors"
+                    className="w-full flex items-center justify-between p-3 sm:p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm font-semibold text-blue-900 cursor-pointer">
+                      <Label className="text-sm font-semibold text-foreground cursor-pointer">
                         Who shares this expense?
                       </Label>
                       {!showSharedBySection &&
                         sharedByMembers.filter((m) => m.selected).length ===
                           sharedByMembers.length && (
-                          <span className="text-xs text-blue-600">
+                          <span className="text-xs text-primary">
                             (All {sharedByMembers.length})
                           </span>
                         )}
                     </div>
                     <div className="flex items-center gap-2">
                       {!showSharedBySection && (
-                        <span className="text-xs text-slate-600 hidden sm:inline">
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
                           {sharedByMembers.filter((m) => m.selected).length ===
                           sharedByMembers.length
                             ? `All members • ৳${
@@ -1218,21 +1218,21 @@ export default function Expenses() {
                         </span>
                       )}
                       {showSharedBySection ? (
-                        <ChevronUp className="w-4 h-4 text-blue-600" />
+                        <ChevronUp className="w-4 h-4 text-primary" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-blue-600" />
+                        <ChevronDown className="w-4 h-4 text-primary" />
                       )}
                     </div>
                   </button>
 
                   {/* Expandable Content */}
                   {showSharedBySection && (
-                    <div className="p-3 sm:p-4 space-y-3 bg-white border-t border-blue-200">
+                    <div className="p-3 sm:p-4 space-y-3 bg-card border-t">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {sharedByMembers.map((member) => (
                           <div
                             key={member.id}
-                            className="flex items-center gap-2 p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 rounded border border-slate-200 hover:border-blue-300 transition-colors"
+                            className="flex items-center gap-2 p-2 sm:p-2.5 bg-muted/30 hover:bg-muted/50 rounded border hover:border-primary transition-colors"
                           >
                             <Checkbox
                               id={`shared-${member.id}`}
@@ -1249,19 +1249,19 @@ export default function Expenses() {
                             />
                             <label
                               htmlFor={`shared-${member.id}`}
-                              className="flex-1 text-sm cursor-pointer text-slate-900"
+                              className="flex-1 text-sm cursor-pointer text-foreground"
                             >
                               {member.name}
                             </label>
                           </div>
                         ))}
                       </div>
-                      <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200">
-                        <span className="text-slate-600">
+                      <div className="flex items-center justify-between text-xs pt-2 border-t">
+                        <span className="text-muted-foreground">
                           {sharedByMembers.filter((m) => m.selected).length} of{" "}
                           {sharedByMembers.length} selected
                         </span>
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-foreground">
                           ৳
                           {formData.amount &&
                           sharedByMembers.filter((m) => m.selected).length > 0
