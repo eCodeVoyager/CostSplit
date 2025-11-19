@@ -13,10 +13,28 @@ const markSettlementPaid = async (req, res) => {
       return res.status(400).json({ message: 'From, to, and amount are required' });
     }
 
+    // Validate MongoDB ObjectId format
+    if (!from.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid "from" member ID' });
+    }
+    if (!to.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid "to" member ID' });
+    }
+
     // Validate amount
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return res.status(400).json({ message: 'Amount must be greater than 0' });
+    }
+
+    // Validate maximum amount (consistent with expense limits)
+    if (parsedAmount > 10000000) {
+      return res.status(400).json({ message: 'Amount cannot exceed 10,000,000' });
+    }
+
+    // Validate decimal places (max 2)
+    if (!/^\d+(\.\d{1,2})?$/.test(amount.toString())) {
+      return res.status(400).json({ message: 'Amount can have at most 2 decimal places' });
     }
 
     // Check if members exist
@@ -95,11 +113,25 @@ const getSettlementHistory = async (req, res) => {
       }
     }
 
-    // Apply custom date range
+    // Apply custom date range with validation
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // Validate dates
+      if (isNaN(start.getTime())) {
+        return res.status(400).json({ message: 'Invalid start date format' });
+      }
+      if (isNaN(end.getTime())) {
+        return res.status(400).json({ message: 'Invalid end date format' });
+      }
+      if (start > end) {
+        return res.status(400).json({ message: 'Start date must be before end date' });
+      }
+
       query.paidDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
+        $gte: start,
+        $lte: end,
       };
     }
 
@@ -132,6 +164,11 @@ const getSettlementHistory = async (req, res) => {
 const deleteSettlement = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate MongoDB ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid settlement ID' });
+    }
 
     const settlement = await Settlement.findById(id);
 

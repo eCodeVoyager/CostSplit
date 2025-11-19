@@ -106,12 +106,17 @@ const deleteMember = async (req, res) => {
       return res.status(404).json({ message: 'Member not found' });
     }
 
-    // Check if member has any expenses
-    const expenseCount = await Expense.countDocuments({ paidBy: id });
+    // Check if member has any expenses (check all possible references)
+    const expenseAsPayer = await Expense.countDocuments({ paidBy: id });
+    const expenseAsMultiPayer = await Expense.countDocuments({ 'payers.member': id });
+    const expenseAsSharer = await Expense.countDocuments({ sharedBy: id });
+    const expenseWithCustomShare = await Expense.countDocuments({ 'customShares.member': id });
 
-    if (expenseCount > 0) {
+    const totalExpenses = expenseAsPayer + expenseAsMultiPayer + expenseAsSharer + expenseWithCustomShare;
+
+    if (totalExpenses > 0) {
       return res.status(400).json({
-        message: `Cannot delete member. This member has ${expenseCount} expense(s) recorded. Please delete those expenses first.`
+        message: `Cannot delete member. This member is referenced in ${totalExpenses} expense(s). Please remove the member from those expenses first.`
       });
     }
 

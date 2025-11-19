@@ -8,15 +8,16 @@ const { calculateBalances, generateSettlements } = require('../utils/balanceCalc
  */
 const getBalances = async (req, res) => {
   try {
-    // Get all active members
-    const members = await Member.find({ isActive: true });
+    // Get ALL members (including inactive) to ensure balance calculations are accurate
+    // Inactive members may have paid for expenses or owe money, so they must be included
+    const members = await Member.find();
 
     if (members.length === 0) {
       return res.status(200).json({
         balances: [],
         settlements: [],
         completedSettlements: [],
-        message: 'No active members found',
+        message: 'No members found',
       });
     }
 

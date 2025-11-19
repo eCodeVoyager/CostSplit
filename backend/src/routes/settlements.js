@@ -5,6 +5,10 @@ const {
   getSettlementHistory,
   deleteSettlement,
 } = require('../controllers/settlementController');
+const authenticateToken = require('../middleware/authMiddleware');
+
+// Apply authentication to all settlement routes
+router.use(authenticateToken);
 
 // Mark a settlement as paid
 router.post('/', markSettlementPaid);

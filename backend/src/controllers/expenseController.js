@@ -168,7 +168,8 @@ const createExpense = async (req, res) => {
         validatedPayers = await Promise.all(payerPromises);
 
         // Verify total payer amounts match expense amount
-        const totalPaid = validatedPayers.reduce((sum, p) => sum + p.amount, 0);
+        // Round the sum to avoid floating point precision errors
+        const totalPaid = Math.round(validatedPayers.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
         if (Math.abs(totalPaid - roundedAmount) > 0.01) {
           return res.status(400).json({
             message: `Total payer amounts (${totalPaid}) must equal expense amount (${roundedAmount})`
@@ -247,7 +248,8 @@ const createExpense = async (req, res) => {
         validatedCustomShares = await Promise.all(sharePromises);
 
         // Verify total custom shares equal expense amount
-        const totalShares = validatedCustomShares.reduce((sum, s) => sum + s.amount, 0);
+        // Round the sum to avoid floating point precision errors
+        const totalShares = Math.round(validatedCustomShares.reduce((sum, s) => sum + s.amount, 0) * 100) / 100;
         if (Math.abs(totalShares - roundedAmount) > 0.01) {
           return res.status(400).json({
             message: `Total custom shares (${totalShares}) must equal expense amount (${roundedAmount})`

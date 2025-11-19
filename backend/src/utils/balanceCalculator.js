@@ -57,7 +57,8 @@ const calculateBalances = (members, expenses, completedSettlements = []) => {
         : members.map(m => m._id);
 
       const totalSharingMembers = membersWhoShare.length;
-      const sharePerPerson = expense.amount / totalSharingMembers;
+      // Round the division result immediately to avoid floating point precision errors
+      const sharePerPerson = Math.round(expense.amount / totalSharingMembers * 100) / 100;
 
       // Only members who share this expense get debited equally
       membersWhoShare.forEach((memberRef) => {
