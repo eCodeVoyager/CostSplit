@@ -32,6 +32,10 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Calculator,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   BarChart,
@@ -78,6 +82,8 @@ export default function CostExplorer() {
   const [selectedMember, setSelectedMember] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [timeView, setTimeView] = useState("monthly"); // "daily", "weekly", "monthly"
+  const [showCalculationGuide, setShowCalculationGuide] = useState(false);
+  const [expandedExpense, setExpandedExpense] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -462,6 +468,144 @@ export default function CostExplorer() {
           </div>
         )}
 
+        {/* Calculation Guide */}
+        {analytics && (
+          <Card className="mb-6 smooth-card border-primary/20">
+            <CardHeader className="p-4 sm:p-6">
+              <button
+                onClick={() => setShowCalculationGuide(!showCalculationGuide)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Calculator className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl">
+                      How Calculations Work
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      Understand how we calculate balances and breakdowns
+                    </CardDescription>
+                  </div>
+                </div>
+                {showCalculationGuide ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+            </CardHeader>
+            {showCalculationGuide && (
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
+                {/* Member Balances */}
+                <div className="p-4 bg-muted/30 rounded-lg space-y-2">
+                  <h4 className="font-semibold flex items-center gap-2 text-primary">
+                    <Users className="w-4 h-4" />
+                    Member Balance Calculation
+                  </h4>
+                  <div className="text-sm space-y-1 text-muted-foreground">
+                    <p><strong className="text-foreground">Total Paid:</strong> Sum of all amounts a member has paid (single or split payments)</p>
+                    <p><strong className="text-foreground">Total Owed:</strong> Sum of all amounts a member owes based on:</p>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li><strong className="text-foreground">Custom Shares:</strong> Their specific assigned amount</li>
+                      <li><strong className="text-foreground">Equal Split:</strong> Total expense ÷ Number of members sharing</li>
+                    </ul>
+                    <p><strong className="text-foreground">Net Balance:</strong> Total Paid - Total Owed</p>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li className="text-green-600 dark:text-green-400">Positive (+): Member should receive money</li>
+                      <li className="text-red-600 dark:text-red-400">Negative (-): Member owes money</li>
+                      <li>Zero (0): Member is settled</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Example Calculation */}
+                <div className="p-4 bg-primary/5 rounded-lg space-y-3 border border-primary/20">
+                  <h4 className="font-semibold flex items-center gap-2 text-primary">
+                    <Calculator className="w-4 h-4" />
+                    Example: Lunch Expense ৳300
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="text-sm">
+                      <p className="font-semibold text-foreground mb-2">Scenario: 3 people share lunch</p>
+                      <div className="space-y-1 text-muted-foreground">
+                        <p>• <strong className="text-foreground">Alice</strong> pays ৳300</p>
+                        <p>• Shared by: <strong className="text-foreground">Alice, Bob, Charlie</strong></p>
+                        <p>• Each person's share: ৳300 ÷ 3 = <strong className="text-primary">৳100</strong></p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                      <div className="p-2 bg-card rounded border">
+                        <p className="font-semibold text-foreground">Alice</p>
+                        <p className="text-xs text-muted-foreground">Paid: ৳300</p>
+                        <p className="text-xs text-muted-foreground">Owes: ৳100</p>
+                        <p className="text-xs font-bold text-green-600">Balance: +৳200</p>
+                      </div>
+                      <div className="p-2 bg-card rounded border">
+                        <p className="font-semibold text-foreground">Bob</p>
+                        <p className="text-xs text-muted-foreground">Paid: ৳0</p>
+                        <p className="text-xs text-muted-foreground">Owes: ৳100</p>
+                        <p className="text-xs font-bold text-red-600">Balance: -৳100</p>
+                      </div>
+                      <div className="p-2 bg-card rounded border">
+                        <p className="font-semibold text-foreground">Charlie</p>
+                        <p className="text-xs text-muted-foreground">Paid: ৳0</p>
+                        <p className="text-xs text-muted-foreground">Owes: ৳100</p>
+                        <p className="text-xs font-bold text-red-600">Balance: -৳100</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Detection */}
+                <div className="p-4 bg-muted/30 rounded-lg space-y-2">
+                  <h4 className="font-semibold flex items-center gap-2 text-primary">
+                    <Tag className="w-4 h-4" />
+                    Category Auto-Detection
+                  </h4>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2 text-foreground">Categories are automatically detected based on expense title keywords:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <p><strong className="text-blue-600">Transportation:</strong> bus, rickshaw, uber, taxi, etc.</p>
+                        <p><strong className="text-orange-600">Food & Drinks:</strong> lunch, dinner, breakfast, tea, etc.</p>
+                        <p><strong className="text-purple-600">Shopping:</strong> shopping, groceries, store, etc.</p>
+                      </div>
+                      <div>
+                        <p><strong className="text-red-600">Bills:</strong> bill, utility, rent, electricity, etc.</p>
+                        <p><strong className="text-green-600">Entertainment:</strong> movie, game, party, etc.</p>
+                        <p><strong className="text-muted-foreground">Other:</strong> Everything else</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Breakdown */}
+                <div className="p-4 bg-muted/30 rounded-lg space-y-2">
+                  <h4 className="font-semibold flex items-center gap-2 text-primary">
+                    <Calendar className="w-4 h-4" />
+                    Time Period Breakdown
+                  </h4>
+                  <div className="text-sm space-y-1 text-muted-foreground">
+                    <p><strong className="text-foreground">Daily:</strong> Shows up to last 30 days of expenses</p>
+                    <p><strong className="text-foreground">Weekly:</strong> Groups by week start date (Sunday), shows last 12 weeks</p>
+                    <p><strong className="text-foreground">Monthly:</strong> Groups by month (YYYY-MM), shows last 12 months</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-900 dark:text-blue-100">
+                    All calculations are rounded to 2 decimal places. Custom shares must equal the total expense amount.
+                    When expenses are split equally, any rounding difference is added to the first member.
+                  </p>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
+
         {/* Graph View */}
         {viewMode === "graphs" && analytics && (
           <div className="space-y-6">
@@ -719,55 +863,186 @@ export default function CostExplorer() {
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="border-b">
-                    <tr className="text-sm text-muted-foreground">
-                      <th className="text-left py-3 px-2">Date</th>
-                      <th className="text-left py-3 px-2">Title</th>
-                      <th className="text-right py-3 px-2">Amount</th>
-                      <th className="text-left py-3 px-2">Paid By</th>
-                      <th className="text-left py-3 px-2">Shared By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.recentExpenses.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="text-center py-12 text-muted-foreground">
-                          No expenses found
-                        </td>
-                      </tr>
-                    ) : (
-                      analytics.recentExpenses.map((expense) => (
-                        <tr key={expense.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-2 text-sm">
-                            {formatDate(expense.date)}
-                          </td>
-                          <td className="py-3 px-2 font-medium">{expense.title}</td>
-                          <td className="text-right py-3 px-2 font-bold">
-                            {formatCurrency(expense.amount)}
-                          </td>
-                          <td className="py-3 px-2 text-sm">
-                            {expense.paidBy.map((p, i) => (
-                              <div key={i}>
-                                {p.name} {expense.paidBy.length > 1 && `(${formatCurrency(p.amount)})`}
-                              </div>
-                            ))}
-                          </td>
-                          <td className="py-3 px-2 text-sm text-muted-foreground">
-                            {expense.customShares
-                              ? expense.customShares.map((s, i) => (
-                                  <div key={i}>
-                                    {s.name} ({formatCurrency(s.amount)})
+              <div className="space-y-2">
+                {analytics.recentExpenses.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No expenses found
+                  </div>
+                ) : (
+                  analytics.recentExpenses.map((expense) => {
+                    const isExpanded = expandedExpense === expense.id;
+                    const sharePerPerson = expense.customShares
+                      ? null
+                      : expense.amount / expense.sharedBy.length;
+
+                    return (
+                      <div key={expense.id} className="border rounded-lg overflow-hidden">
+                        {/* Main Row - Clickable */}
+                        <button
+                          onClick={() => setExpandedExpense(isExpanded ? null : expense.id)}
+                          className="w-full flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-4">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Date</p>
+                              <p className="text-sm font-medium">{formatDate(expense.date)}</p>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-muted-foreground">Title</p>
+                              <p className="text-sm font-semibold">{expense.title}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Amount</p>
+                              <p className="text-sm font-bold text-primary">
+                                {formatCurrency(expense.amount)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Paid By</p>
+                              <p className="text-sm">
+                                {expense.paidBy.length === 1
+                                  ? expense.paidBy[0].name
+                                  : `${expense.paidBy.length} people`}
+                              </p>
+                            </div>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                          <div className="p-4 pt-0 space-y-4 bg-muted/30">
+                            {/* Payment Breakdown */}
+                            <div className="p-3 bg-card rounded-lg border">
+                              <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Calculator className="w-4 h-4 text-green-600" />
+                                Who Paid
+                              </h5>
+                              <div className="space-y-1">
+                                {expense.paidBy.map((p, i) => (
+                                  <div key={i} className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">{p.name}</span>
+                                    <span className="font-semibold text-green-600">
+                                      {formatCurrency(p.amount)}
+                                    </span>
                                   </div>
-                                ))
-                              : expense.sharedBy.join(", ")}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                                ))}
+                                {expense.paidBy.length > 1 && (
+                                  <div className="flex justify-between text-sm pt-2 border-t">
+                                    <span className="font-semibold">Total Paid</span>
+                                    <span className="font-bold text-green-600">
+                                      {formatCurrency(expense.amount)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Cost Sharing Breakdown */}
+                            <div className="p-3 bg-card rounded-lg border">
+                              <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-orange-600" />
+                                Cost Sharing
+                                {expense.customShares && (
+                                  <span className="text-xs text-violet-600 dark:text-violet-400 font-normal">
+                                    (Custom Shares)
+                                  </span>
+                                )}
+                              </h5>
+                              <div className="space-y-1">
+                                {expense.customShares ? (
+                                  // Custom shares - show each person's specific amount
+                                  <>
+                                    {expense.customShares.map((s, i) => (
+                                      <div key={i} className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">{s.name}</span>
+                                        <span className="font-semibold text-orange-600">
+                                          {formatCurrency(s.amount)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    <div className="flex justify-between text-sm pt-2 border-t">
+                                      <span className="font-semibold">Total Cost</span>
+                                      <span className="font-bold text-orange-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  // Equal split - show calculation
+                                  <>
+                                    <div className="text-xs text-muted-foreground mb-2 p-2 bg-muted/50 rounded">
+                                      {formatCurrency(expense.amount)} ÷ {expense.sharedBy.length} people = {formatCurrency(sharePerPerson)} each
+                                    </div>
+                                    {expense.sharedBy.map((name, i) => (
+                                      <div key={i} className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">{name}</span>
+                                        <span className="font-semibold text-orange-600">
+                                          {formatCurrency(sharePerPerson)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    <div className="flex justify-between text-sm pt-2 border-t">
+                                      <span className="font-semibold">Total Cost</span>
+                                      <span className="font-bold text-orange-600">
+                                        {formatCurrency(expense.amount)}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Individual Balance Impact */}
+                            <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                              <h5 className="font-semibold text-sm mb-2 flex items-center gap-2 text-primary">
+                                <Info className="w-4 h-4" />
+                                Balance Impact
+                              </h5>
+                              <div className="space-y-1">
+                                {/* Calculate and show each member's balance change */}
+                                {analytics.memberBreakdown
+                                  .filter((member) => {
+                                    // Show members who either paid or owe for this expense
+                                    const paid = expense.paidBy.find(p => p.name === member.memberName);
+                                    const owes = expense.customShares
+                                      ? expense.customShares.find(s => s.name === member.memberName)
+                                      : expense.sharedBy.includes(member.memberName);
+                                    return paid || owes;
+                                  })
+                                  .map((member) => {
+                                    const paidAmount = expense.paidBy.find(p => p.name === member.memberName)?.amount || 0;
+                                    const owedAmount = expense.customShares
+                                      ? expense.customShares.find(s => s.name === member.memberName)?.amount || 0
+                                      : expense.sharedBy.includes(member.memberName) ? sharePerPerson : 0;
+                                    const impact = paidAmount - owedAmount;
+
+                                    return (
+                                      <div key={member.memberId} className="flex justify-between text-sm">
+                                        <span className="text-foreground">{member.memberName}</span>
+                                        <span className={`font-semibold ${
+                                          impact > 0 ? 'text-green-600' : impact < 0 ? 'text-red-600' : 'text-muted-foreground'
+                                        }`}>
+                                          {impact > 0 && '+'}{formatCurrency(impact)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-3 pt-2 border-t">
+                                Positive = receives money • Negative = owes money
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Pagination */}
