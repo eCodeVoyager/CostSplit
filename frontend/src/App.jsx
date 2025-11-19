@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import Expenses from './pages/Expenses';
 import Balances from './pages/Balances';
+import CostExplorer from './pages/CostExplorer';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,6 +58,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Balances />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/cost-explorer"
+            element={
+              <PrivateRoute>
+                <CostExplorer />
               </PrivateRoute>
             }
           />

@@ -5,7 +5,7 @@ import { membersAPI, expensesAPI } from '../lib/api';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Wallet, Users, Receipt, Scale, LogOut, TrendingUp, Clock, Plus } from 'lucide-react';
+import { Wallet, Users, Receipt, Scale, LogOut, TrendingUp, Clock, Plus, BarChart3 } from 'lucide-react';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -86,7 +86,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-2 mb-6 sm:flex sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
           <Button
             onClick={() => navigate('/expenses')}
             size="sm"
@@ -112,6 +112,15 @@ export default function Dashboard() {
           >
             <Scale className="w-4 h-4" />
             <span className="text-xs sm:text-sm">Balances</span>
+          </Button>
+          <Button
+            onClick={() => navigate('/cost-explorer')}
+            variant="outline"
+            size="sm"
+            className="h-11 flex-col sm:flex-row gap-1 sm:gap-2 soft-button bg-gradient-to-br from-primary/10 to-primary/5"
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span className="text-xs sm:text-sm">Analytics</span>
           </Button>
         </div>
 
@@ -294,7 +303,7 @@ export default function Dashboard() {
         </div>
 
         {/* Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Link to="/members">
             <Card className="smooth-card cursor-pointer">
               <CardHeader className="p-4">
@@ -337,6 +346,22 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <CardTitle className="text-base sm:text-lg">Balances</CardTitle>
                     <CardDescription className="text-xs sm:text-sm">View settlements</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          <Link to="/cost-explorer">
+            <Card className="smooth-card cursor-pointer bg-gradient-to-br from-primary/5 to-transparent border-primary/20 hover:border-primary/40">
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base sm:text-lg">Cost Explorer</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Analytics & insights</CardDescription>
                   </div>
                 </div>
               </CardHeader>

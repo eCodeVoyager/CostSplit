@@ -6,6 +6,7 @@ const {
   toggleExpenseSettled,
   deleteExpense,
   getExpenseStats,
+  getCostAnalytics,
 } = require('../controllers/expenseController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -17,6 +18,9 @@ router.get('/', getAllExpenses);
 
 // GET /api/expenses/stats
 router.get('/stats', getExpenseStats);
+
+// GET /api/expenses/analytics - Cost breakdown and analytics
+router.get('/analytics', getCostAnalytics);
 
 // POST /api/expenses
 router.post('/', createExpense);
