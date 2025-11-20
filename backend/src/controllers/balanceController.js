@@ -20,10 +20,12 @@ const getBalances = async (req, res) => {
       });
     }
 
-    // Get all expenses with populated paidBy and payers
+    // Get all expenses with populated paidBy, payers, sharedBy, and customShares
     const expenses = await Expense.find()
       .populate('paidBy', 'name')
-      .populate('payers.member', 'name');
+      .populate('payers.member', 'name')
+      .populate('sharedBy', 'name')
+      .populate('customShares.member', 'name');
 
     // Get completed settlements
     const completedSettlements = await Settlement.find()

@@ -873,7 +873,9 @@ export default function CostExplorer() {
                     const isExpanded = expandedExpense === expense.id;
                     const sharePerPerson = expense.customShares
                       ? null
-                      : expense.amount / expense.sharedBy.length;
+                      : expense.sharedBy.length > 0
+                      ? expense.amount / expense.sharedBy.length
+                      : 0;
 
                     return (
                       <div key={expense.id} className="border rounded-lg overflow-hidden">
@@ -972,7 +974,7 @@ export default function CostExplorer() {
                                       </span>
                                     </div>
                                   </>
-                                ) : (
+                                ) : expense.sharedBy.length > 0 ? (
                                   // Equal split - show calculation
                                   <>
                                     <div className="text-xs text-muted-foreground mb-2 p-2 bg-muted/50 rounded">
@@ -993,6 +995,11 @@ export default function CostExplorer() {
                                       </span>
                                     </div>
                                   </>
+                                ) : (
+                                  // No members sharing - data error
+                                  <div className="text-xs text-yellow-600 dark:text-yellow-500 p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded">
+                                    No members assigned to share this expense
+                                  </div>
                                 )}
                               </div>
                             </div>

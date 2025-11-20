@@ -348,12 +348,12 @@ export default function Expenses() {
       }
 
       // Initialize split payers when enabling split mode
-      // All members selected by default
+      // No members selected by default - user must choose who paid
       setSplitPayers(
         members.map((member) => ({
           id: member._id,
           name: member.name,
-          selected: true,
+          selected: false,
           amount: "0",
         }))
       );
@@ -449,12 +449,12 @@ export default function Expenses() {
       }
 
       // Initialize custom shares when enabling custom mode
-      // All members selected by default with 0 amount
+      // No members selected by default - user must choose who shares the cost
       setCustomShares(
         members.map((member) => ({
           id: member._id,
           name: member.name,
-          selected: true,
+          selected: false,
           amount: "0",
         }))
       );
