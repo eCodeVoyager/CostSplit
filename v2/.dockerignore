@@ -1,0 +1,8 @@
+node_modules
+android
+dist-android
+src
+data
+assets
+public
+*.md

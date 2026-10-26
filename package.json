@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CostSplit - Shared Expense Manager (MERN Stack)",
   "scripts": {
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install && cd ../v2 && npm install",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -17,7 +17,12 @@
     "pm2:delete": "pm2 delete costsplit-backend",
     "pm2:logs": "pm2 logs costsplit-backend",
     "pm2:monit": "pm2 monit",
-    "pm2:status": "pm2 status"
+    "pm2:status": "pm2 status",
+    "dev:v2": "cd v2 && npm run dev",
+    "build:v2": "cd v2 && npm run build",
+    "test:v2": "cd v2 && npm test",
+    "server:v2": "cd v2 && npm run server",
+    "apk:v2": "cd v2 && npm run apk"
   },
   "keywords": [
     "expense",

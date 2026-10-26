@@ -1,5 +1,7 @@
 # CostSplit - Shared Expense Manager
 
+> **CostSplit v2** (Android app + offline-first web app, multi-trip, multi-currency) lives in [`v2/`](./v2/README.md). It has its own tiny zero-dependency sync server and does not use this backend or MongoDB. v1 below is unchanged.
+
 A complete MERN stack application for managing shared expenses among groups. Perfect for roommates, travel groups, or any shared spending scenarios.
 
 ## Overview

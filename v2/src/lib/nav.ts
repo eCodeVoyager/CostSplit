@@ -1,0 +1,24 @@
+export const LAST_TRIP_KEY = "costsplit:lastTrip"
+
+export function rememberTrip(tripId: string | null) {
+  try {
+    if (tripId) localStorage.setItem(LAST_TRIP_KEY, tripId)
+    else localStorage.removeItem(LAST_TRIP_KEY)
+  } catch {
+    // Not critical
+  }
+}
+
+const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
+
+export function isTripId(value: string) {
+  return ID_RE.test(value)
+}
+
+/** Accepts a full invite link, a /t/ link or a bare trip id */
+export function parseInvite(input: string): string | null {
+  const text = input.trim()
+  const match = text.match(/\/(?:join|t)\/([A-Za-z0-9_-]{8,64})/)
+  const id = match ? match[1] : text
+  return isTripId(id) ? id : null
+}

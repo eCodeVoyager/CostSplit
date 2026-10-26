@@ -1,0 +1,11 @@
+node_modules
+dist
+dev-dist
+*.local
+.env
+data/
+dist-android
+.env.production
+.env.android-release
+*.jks
+*.keystore

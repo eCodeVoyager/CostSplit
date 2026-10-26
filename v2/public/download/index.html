@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Get CostSplit</title>
+    <meta name="description" content="Download CostSplit for Android: shared home and trip costs, bills, bazar and meals. Works offline." />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#1d5fbf" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <style>
+      :root {
+        --bg: #f7f9fc;
+        --card: #ffffff;
+        --text: #172033;
+        --muted: #5b6577;
+        --border: #e2e7ef;
+        --primary: #1d5fbf;
+        --primary-text: #ffffff;
+        --soft: #e8f0fc;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1220;
+          --card: #131c2e;
+          --text: #eef2f8;
+          --muted: #a3adbf;
+          --border: #24304a;
+          --primary: #6aa3f5;
+          --primary-text: #0b1220;
+          --soft: #1a2740;
+          color-scheme: dark;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 30rem;
+        margin: 0 auto;
+        padding: calc(24px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      header img {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+      }
+      h1 {
+        font-size: 1.6rem;
+        line-height: 1.2;
+        margin: 0;
+      }
+      .tag {
+        color: var(--muted);
+        margin: 2px 0 0;
+        font-size: 0.95rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 20px;
+        margin-top: 20px;
+      }
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 54px;
+        border-radius: 14px;
+        font-weight: 650;
+        font-size: 1.05rem;
+        text-decoration: none;
+        background: var(--primary);
+        color: var(--primary-text);
+      }
+      .btn.secondary {
+        background: var(--soft);
+        color: var(--text);
+        font-weight: 600;
+      }
+      .btn svg {
+        width: 22px;
+        height: 22px;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+        text-align: center;
+        margin: 10px 0 0;
+        font-variant-numeric: tabular-nums;
+      }
+      h2 {
+        font-size: 1rem;
+        margin: 0 0 12px;
+      }
+      ol {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+      ol li {
+        margin: 8px 0;
+      }
+      .features {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 12px;
+      }
+      .features li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .features b {
+        display: block;
+      }
+      .features span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .dot {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--soft);
+        color: var(--primary);
+        display: grid;
+        place-items: center;
+      }
+      .dot svg {
+        width: 18px;
+        height: 18px;
+      }
+      .qr {
+        display: none;
+        align-items: center;
+        gap: 16px;
+      }
+      .qr img {
+        width: 120px;
+        height: 120px;
+        background: #fff;
+        border-radius: 12px;
+        padding: 6px;
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .qr.ready {
+          display: flex;
+        }
+      }
+      .small {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      a {
+        color: var(--primary);
+      }
+      .stack {
+        display: grid;
+        gap: 10px;
+      }
+      footer {
+        margin-top: 28px;
+        text-align: center;
+      }
+      code {
+        font-size: 0.75rem;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="/pwa-192x192.png" alt="" />
+        <div>
+          <h1>CostSplit</h1>
+          <p class="tag">Flatmates, bills, bazar. Sorted. Works offline.</p>
+        </div>
+      </header>
+
+      <section class="card stack" aria-label="Download">
+        <a class="btn" id="apk" href="/download/costsplit.apk" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+          Download for Android
+        </a>
+        <a class="btn secondary" href="/">Open the web app instead</a>
+        <p class="meta" id="meta">Android 7 or newer</p>
+      </section>
+
+      <section class="card qr" id="qr-card" aria-label="Scan with your phone">
+        <img id="qr" src="/download/qr.svg" alt="QR code for this page" />
+        <p class="small">On a computer? Scan this with your Android phone to download the app there.</p>
+      </section>
+
+      <section class="card" aria-labelledby="install">
+        <h2 id="install">Install in 3 steps</h2>
+        <ol>
+          <li>Tap <b>Download for Android</b>.</li>
+          <li>Open the downloaded file. If asked, allow your browser to <b>install unknown apps</b>.</li>
+          <li>Open CostSplit, start your home and share the invite link with your flatmates.</li>
+        </ol>
+        <p class="small">Updating later: the app tells you when a new version is out. Install it over the old one; your data stays.</p>
+      </section>
+
+      <section class="card" aria-labelledby="what">
+        <h2 id="what">What it does</h2>
+        <ul class="features">
+          <li>
+            <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg></span>
+            <div><b>Monthly bills</b><span>Rent, electricity, gas, internet, maid. Set once, tap Pay each month.</span></div>
+          </li>
+          <li>
+            <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg></span>
+            <div><b>Bazar and meals</b><span>Split groceries equally or by meals eaten, with a live meal rate.</span></div>
+          </li>
+          <li>
+            <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01" /><path d="M8.5 16.43a5 5 0 0 1 7 0" /><path d="M2 8.82a15 15 0 0 1 20 0" /><path d="M5 12.86a10 10 0 0 1 14 0" /></svg></span>
+            <div><b>No signal, no account</b><span>Everything saves on your phone and syncs when you're online.</span></div>
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        <p class="small">iPhone? Open the <a href="/">web app</a> in Safari, tap Share, then “Add to Home Screen”.</p>
+        <p class="small" id="checksum" hidden></p>
+      </footer>
+    </main>
+    <script>
+      // Fill in version and size from version.json (written by scripts/release.mjs)
+      fetch("/download/version.json", { cache: "no-store" })
+        .then(function (r) {
+          return r.ok ? r.json() : null
+        })
+        .then(function (v) {
+          if (!v) return
+          var mb = v.size ? " · " + (v.size / 1048576).toFixed(1) + " MB" : ""
+          var date = v.date ? " · " + new Date(v.date).toLocaleDateString() : ""
+          document.getElementById("meta").textContent = "Version " + v.version + mb + date + " · Android 7+"
+          if (v.file) document.getElementById("apk").href = "/download/" + v.file
+          if (v.sha256) {
+            var c = document.getElementById("checksum")
+            c.hidden = false
+            c.innerHTML = "SHA-256 <code></code>"
+            c.querySelector("code").textContent = v.sha256
+          }
+        })
+        .catch(function () {})
+      // QR only exists when the release was built with VITE_PUBLIC_URL
+      var qr = document.getElementById("qr")
+      function showQr() {
+        if (qr.naturalWidth) document.getElementById("qr-card").classList.add("ready")
+      }
+      qr.onload = showQr
+      if (qr.complete) showQr()
+    </script>
+  </body>
+</html>

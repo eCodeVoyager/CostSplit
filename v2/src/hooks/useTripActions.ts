@@ -1,0 +1,26 @@
+import { createContext, useContext } from "react"
+import type { ExpensePreset } from "@/components/ExpenseSheet"
+import type { Transfer } from "@/lib/balance"
+import type { Bill, Expense } from "@/lib/types"
+import type { BillStatus } from "./useTripData"
+
+/** Sheets and dialogs every screen of a group can open */
+export interface TripActions {
+  /** The "+" chooser */
+  openAdd: () => void
+  addExpense: (preset?: ExpensePreset) => void
+  editExpense: (e: Expense) => void
+  recordPayment: (suggestion?: Transfer) => void
+  payBill: (status: BillStatus) => void
+  editBill: (bill?: Bill) => void
+  invite: () => void
+  changeMe: () => void
+}
+
+export const ActionsContext = createContext<TripActions | null>(null)
+
+export function useTripActions() {
+  const actions = useContext(ActionsContext)
+  if (!actions) throw new Error("useTripActions must be used inside a group screen")
+  return actions
+}
