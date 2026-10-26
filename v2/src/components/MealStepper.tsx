@@ -21,19 +21,20 @@ export function MealStepper({
   half?: boolean
 }) {
   const change = (delta: number) => setMeals(tripId, date, member.id, count + delta)
+  // Tapped every day: buttons sit at the 44px touch minimum
   return (
-    <div className="flex min-h-13 items-center gap-2 px-3 py-1.5">
+    <div className="flex min-h-14 items-center gap-2 px-3 py-1.5">
       <MemberAvatar id={member.id} name={member.name} className="size-8" />
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
       {half && (
-        <Button variant="ghost" className="h-10 px-2 text-sm" onClick={() => change(0.5)} aria-label={`Half meal for ${member.name}`}>
+        <Button variant="ghost" className="h-11 px-2 text-sm" onClick={() => change(0.5)} aria-label={`Half meal for ${member.name}`}>
           +½
         </Button>
       )}
       <Button
         variant="outline"
         size="icon"
-        className="size-10"
+        className="size-11"
         onClick={() => change(-Math.min(1, count))}
         disabled={count <= 0}
         aria-label={`Fewer meals for ${member.name}`}
@@ -43,7 +44,7 @@ export function MealStepper({
       <span className="w-9 text-center text-lg font-semibold tabular" aria-live="polite">
         {count}
       </span>
-      <Button variant="outline" size="icon" className="size-10" onClick={() => change(1)} aria-label={`More meals for ${member.name}`}>
+      <Button variant="outline" size="icon" className="size-11" onClick={() => change(1)} aria-label={`More meals for ${member.name}`}>
         <Plus />
       </Button>
     </div>

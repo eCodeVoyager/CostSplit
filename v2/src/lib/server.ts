@@ -1,5 +1,3 @@
-const KEY = "costsplit:server"
-
 /** Baked in at build time; empty means "same origin as the web app" */
 const BUILT_IN = normalize(import.meta.env.VITE_SERVER_URL ?? "")
 /** Public web address (S3/CDN or the server itself) */
@@ -14,20 +12,16 @@ function normalize(url: string) {
   return url.trim().replace(/\/+$/, "")
 }
 
+/** The sync server is fixed per build (not editable in the app) */
 export function getServerUrl(): string {
-  try {
-    return localStorage.getItem(KEY) ?? BUILT_IN
-  } catch {
-    return BUILT_IN
-  }
+  return BUILT_IN
 }
 
-export function saveServerUrl(url: string) {
-  try {
-    localStorage.setItem(KEY, normalize(url))
-  } catch {
-    // Storage blocked: keep using the built-in server
-  }
+// Older builds let people type a server address; forget any saved one
+try {
+  localStorage.removeItem("costsplit:server")
+} catch {
+  // Storage blocked: nothing was saved either
 }
 
 /** The native app has no "same origin" server, so it needs an explicit URL */
@@ -49,14 +43,3 @@ export function publicOrigin() {
 }
 
 export const isAndroidBrowser = !isNative && /android/i.test(navigator.userAgent)
-
-export async function checkServer(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${normalize(url) || window.location.origin}/api/health`, {
-      signal: AbortSignal.timeout(6000),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}

@@ -32,5 +32,6 @@ export async function fetchRate(base: string, quote: string): Promise<number> {
   const data = (await res.json()) as { rates?: Record<string, number> }
   const rate = data.rates?.[quote]
   if (!rate) throw new Error(`No rate for ${quote}`)
-  return Math.round(rate * 10_000) / 10_000
+  // Significant digits, not decimals: 1 BDT = 0.0072 EUR would be 0.6% off (৳77 on €100)
+  return Number(rate.toPrecision(6))
 }

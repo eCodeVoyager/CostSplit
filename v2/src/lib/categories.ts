@@ -117,6 +117,8 @@ export const STARTER_BILLS = [
 ]
 
 const KEYWORDS: [RegExp, string][] = [
+  // Drinking water is bazar, not the water bill
+  [/drinking water|mineral water|water jar|filter water|bottled water|\bjar\b/i, "groceries"],
   [/\brent\b|bhara|vara|service charge|landlord/i, "rent"],
   [/electric|current|bidyut|biddut|prepaid meter|\bgas\b|titas|water|pani|wasa|utility/i, "utilities"],
   [/internet|wifi|wi-fi|broadband|\bnet\b|mobile recharge|recharge|phone bill/i, "internet"],

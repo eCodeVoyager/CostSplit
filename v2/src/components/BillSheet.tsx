@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { cn, UNDO_MS } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
@@ -12,7 +13,6 @@ import { getCategory, guessCategory, STARTER_BILLS } from "@/lib/categories"
 import { currencySymbol, formatMoney, minorToInput, parseAmount } from "@/lib/money"
 import { restore, saveBill, softDelete } from "@/lib/repo"
 import type { Bill } from "@/lib/types"
-import { cn } from "@/lib/utils"
 import { Chip, MemberAvatar, Segmented } from "./common"
 
 type Who = "everyone" | "some" | "fixed"
@@ -117,7 +117,7 @@ export function BillSheet({
     onOpenChange(false)
     toast("Bill removed", {
       description: "Past payments stay in the history.",
-      action: { label: "Undo", onClick: () => restore("bills", bill.id) },
+      duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("bills", bill.id) },
     })
   }
 

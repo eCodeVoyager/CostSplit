@@ -68,12 +68,14 @@ function billStatuses(bills: Bill[], expenses: Expense[]): BillStatus[] {
   const out: BillStatus[] = []
   for (const bill of bills) {
     if (!bill.active) continue
+    const created = toISODate(new Date(bill.createdAt))
     for (const period of [previous, current]) {
       const paid = paidBy.get(`${bill.id}:${period}`)
       // Last month only matters if the bill existed then and is still unpaid
-      if (period === previous && (paid || toISODate(new Date(bill.createdAt)).slice(0, 7) >= current)) continue
+      if (period === previous && (paid || created.slice(0, 7) >= current)) continue
       const due = `${period}-${String(bill.dueDay).padStart(2, "0")}`
-      out.push({ bill, period, paid, due, overdue: !paid && due < today })
+      // A bill added after its due day (new home on the 26th, rent due the 5th) isn't late yet
+      out.push({ bill, period, paid, due, overdue: !paid && due < today && created <= due })
     }
   }
   return out.sort((a, b) => Number(!!a.paid) - Number(!!b.paid) || a.due.localeCompare(b.due))

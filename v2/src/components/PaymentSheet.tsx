@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { UNDO_MS } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
@@ -60,7 +61,7 @@ export function PaymentSheet({
     navigator.vibrate?.(15)
     close()
     toast.success(`${label(from)} paid ${to === meId ? "you" : label(to)} ${formatMoney(amount, trip.currency)}`, {
-      action: { label: "Undo", onClick: () => softDelete("payments", id) },
+      duration: UNDO_MS, action: { label: "Undo", onClick: () => softDelete("payments", id) },
     })
   }
 

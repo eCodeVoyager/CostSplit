@@ -1,17 +1,47 @@
-import { Copy, Share2 } from "lucide-react"
+import { Copy, Share2, UserRound } from "lucide-react"
 import { useMemo } from "react"
 import { toast } from "sonner"
 import { renderSVG } from "uqr"
+import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useBackClose } from "@/hooks/useBackClose"
+import { useSession } from "@/lib/auth"
+import { hasServer } from "@/lib/server"
 import { shareOrCopy, tripLink } from "@/lib/share"
 import type { Trip } from "@/lib/types"
 
 export function ShareDialog({ trip, open, onOpenChange }: { trip: Trip; open: boolean; onOpenChange: (o: boolean) => void }) {
   useBackClose(open, () => onOpenChange(false))
+  const session = useSession()
   const link = tripLink(trip.id)
   const svg = useMemo(() => renderSVG(link, { border: 2, pixelSize: 8 }), [link])
+
+  // The link only works once this group is on the server, which needs an account
+  if (hasServer() && !session) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign in to invite</DialogTitle>
+            <DialogDescription>
+              Right now “{trip.name}” is only on this phone. Sign in with your email so it syncs, then share the link.
+            </DialogDescription>
+          </DialogHeader>
+          <Button
+            className="h-11"
+            onClick={() => {
+              // Close first, then open the sheet once this dialog has left the history stack
+              onOpenChange(false)
+              setTimeout(() => openSignIn("Sign in so others can join with your invite link."), 220)
+            }}
+          >
+            <UserRound /> Sign in with email
+          </Button>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   const share = async () => {
     const result = await shareOrCopy({

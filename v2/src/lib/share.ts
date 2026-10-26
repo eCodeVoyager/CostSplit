@@ -1,9 +1,11 @@
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem"
+import { Share } from "@capacitor/share"
 import type { Transfer } from "./balance"
 import { expenseImpact, type MealWeights } from "./balance"
 import { getCategory } from "./categories"
 import { formatMoney, toMajor } from "./money"
 import type { MonthSummary } from "./month"
-import { publicOrigin } from "./server"
+import { isNative, publicOrigin } from "./server"
 import type { Expense, Member, Trip } from "./types"
 
 export function tripLink(tripId: string) {
@@ -12,6 +14,15 @@ export function tripLink(tripId: string) {
 
 /** Native share sheet when available (WhatsApp, Telegram...), clipboard otherwise */
 export async function shareOrCopy(data: { title?: string; text: string; url?: string }): Promise<"shared" | "copied" | "cancelled"> {
+  // The Android WebView has no navigator.share; the Share plugin opens the system sheet
+  if (isNative) {
+    try {
+      await Share.share({ ...data, dialogTitle: data.title })
+      return "shared"
+    } catch {
+      return "cancelled"
+    }
+  }
   if (navigator.share) {
     try {
       await navigator.share(data)
@@ -85,7 +96,20 @@ export function expensesCsv(trip: Trip, members: Member[], expenses: Expense[], 
   return [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n")
 }
 
-export function downloadFile(name: string, content: string, type: string) {
+/**
+ * Saves a file. In the Android app the WebView ignores download links, so the file is
+ * written to the app cache and handed to the share sheet (Drive, Files, WhatsApp...).
+ */
+export async function downloadFile(name: string, content: string, type: string) {
+  if (isNative) {
+    const { uri } = await Filesystem.writeFile({ path: name, data: content, directory: Directory.Cache, encoding: Encoding.UTF8 })
+    try {
+      await Share.share({ title: name, files: [uri], dialogTitle: "Save or send" })
+    } catch {
+      // Closed the share sheet without picking an app
+    }
+    return
+  }
   const url = URL.createObjectURL(new Blob([content], { type }))
   const a = document.createElement("a")
   a.href = url

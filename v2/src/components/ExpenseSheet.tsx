@@ -1,6 +1,7 @@
 import { CalendarDays, Check, Minus, Plus, StickyNote, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { cn, UNDO_MS } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
@@ -14,7 +15,6 @@ import { addDays, toISODate } from "@/lib/dates"
 import { allocate, convertToBase, currencySymbol, formatMoney, minorToInput, parseAmount } from "@/lib/money"
 import { restore, saveExpense, softDelete } from "@/lib/repo"
 import type { Expense, SplitMode } from "@/lib/types"
-import { cn } from "@/lib/utils"
 import { Chip, MemberAvatar, Segmented } from "./common"
 import { PhotoField } from "./PhotoField"
 
@@ -309,7 +309,7 @@ export function ExpenseSheet({
     preset?.onSaved?.(id)
     if (!expense) {
       toast.success(`Added ${income ? "money in " : ""}${formatMoney(amount, cur)}`, {
-        action: { label: "Undo", onClick: () => softDelete("expenses", id) },
+        duration: UNDO_MS, action: { label: "Undo", onClick: () => softDelete("expenses", id) },
       })
     }
   }
@@ -319,7 +319,7 @@ export function ExpenseSheet({
     await softDelete("expenses", expense.id)
     draftFor.current = null
     close()
-    toast("Expense deleted", { action: { label: "Undo", onClick: () => restore("expenses", expense.id) } })
+    toast("Expense deleted", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("expenses", expense.id) } })
   }
 
   const showErrors = submitted || form.amountText !== ""

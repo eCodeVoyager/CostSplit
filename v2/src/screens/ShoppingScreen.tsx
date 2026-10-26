@@ -1,6 +1,7 @@
 import { Check, ListChecks, Plus, Receipt, X } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { UNDO_MS } from "@/lib/utils"
 import { EmptyState, SectionTitle } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,7 +44,7 @@ export default function ShoppingScreen() {
   const clear = async (list: ShopItem[]) => {
     await removeItems(list.map((i) => i.id))
     toast(`Removed ${list.length} ${list.length === 1 ? "item" : "items"}`, {
-      action: { label: "Undo", onClick: () => list.forEach((i) => restore("items", i.id)) },
+      duration: UNDO_MS, action: { label: "Undo", onClick: () => list.forEach((i) => restore("items", i.id)) },
     })
   }
 

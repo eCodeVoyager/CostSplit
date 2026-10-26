@@ -71,4 +71,5 @@ echo "Health:   $(curl -s -o /dev/null -w '%{http_code}' $local/api/health)"
 echo "App:      $(curl -s -o /dev/null -w '%{http_code}' $local/t/check-route)"
 echo "Download: $(curl -s -o /dev/null -w '%{http_code}' $local/download/) $(curl -s $local/download/version.json | tr -d '\n ' | cut -c1-60)"
 echo "APK:      $(curl -s -o /dev/null -w '%{http_code} %{content_type}' -I $local/download/costsplit.apk)"
-echo "Sign-in:  $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"probe@example.com"}' $local/api/auth/start) (503 until RESEND_API_KEY is set)"
+# Resend test inbox: really sends, but only to Resend (example.com is refused)
+echo "Sign-in:  $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"email":"delivered@resend.dev"}' $local/api/auth/start) (200 = code emailed, 503 = no RESEND_API_KEY, 502 = Resend refused, see pm2 logs)"

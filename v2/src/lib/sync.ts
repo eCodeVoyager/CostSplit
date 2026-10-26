@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react"
 import { authHeaders, fetchMyGroups, getSession, onSessionChange, sessionExpired } from "./auth"
 import { allRowTables, CHILD_TABLES, cursorKey, db, getKV, SYNC_TABLES, table } from "./db"
-import { apiUrl, hasServer, saveServerUrl } from "./server"
+import { apiUrl, hasServer } from "./server"
 import type { AnyRow, TableName } from "./types"
 
 export type SyncStatus = "idle" | "syncing" | "offline" | "error" | "disabled" | "signedout"
@@ -156,7 +156,7 @@ export async function syncTrip(tripId: string) {
 /** Download a group someone shared. Throws TripNotFoundError for unknown ids. */
 export async function joinTrip(tripId: string) {
   if (await db.trips.get(tripId)) return
-  if (!hasServer()) throw new Error("No sync server set. Add one under More → Settings → App.")
+  if (!hasServer()) throw new Error("This build has no sync server (VITE_SERVER_URL is empty)")
   if (!getSession()) throw new SignedOutError()
   await syncTrip(tripId)
 }
@@ -175,6 +175,18 @@ export async function restoreFromAccount() {
     }
   }
   return restored
+}
+
+/** Stop being a member on the server, so the group isn't restored on your other phones */
+export async function leaveGroup(tripId: string) {
+  if (!canSync() || !navigator.onLine) return
+  const res = await fetch(apiUrl("/groups/leave"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ tripId }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (res.status === 401) sessionExpired()
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -217,11 +229,14 @@ async function runSync() {
   }
   running = false
 
+  // fetch rejects with a TypeError when there's no connection, and times out on a dead one
+  const noNetwork =
+    !navigator.onLine || failed instanceof TypeError || (failed instanceof DOMException && failed.name === "TimeoutError")
   if (failed instanceof SignedOutError) {
     setState({ status: "signedout", error: undefined })
   } else if (failed) {
     setState({
-      status: navigator.onLine ? "error" : "offline",
+      status: noNetwork ? "offline" : "error",
       error: failed instanceof Error ? failed.message : String(failed),
     })
   } else {
@@ -234,22 +249,6 @@ async function runSync() {
     queued = false
     requestSync(0)
   }
-}
-
-/**
- * Point the app at another server. Every local row is queued again and pull
- * cursors reset, so the new server receives the full history.
- */
-export async function changeServer(url: string) {
-  saveServerUrl(url)
-  await db.transaction("rw", [...allRowTables(), db.kv, db.files], async () => {
-    for (const name of SYNC_TABLES) await table(name).toCollection().modify({ dirty: 1 })
-    await db.files.toCollection().modify({ uploaded: 0 })
-    const keys = (await db.kv.toCollection().primaryKeys()).filter((k) => String(k).startsWith("cursor:"))
-    await db.kv.bulkDelete(keys)
-  })
-  setState({ status: idleStatus(), error: undefined })
-  requestSync(0)
 }
 
 let started = false

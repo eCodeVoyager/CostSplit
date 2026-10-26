@@ -12,6 +12,14 @@ def keystoreFile = rootProject.file('keystore.properties')
 def keystore = new Properties()
 if (keystoreFile.exists()) keystoreFile.withInputStream { keystore.load(it) }
 
+// Invite links (https://<host>/join/...) open the app: host = VITE_PUBLIC_URL of the release build
+def appLinkHost = 'localhost'
+def releaseEnv = file('../../.env.android-release')
+if (releaseEnv.exists()) {
+    def line = releaseEnv.readLines().find { it.startsWith('VITE_PUBLIC_URL=') }
+    if (line) appLinkHost = new URI(line.substring('VITE_PUBLIC_URL='.length()).trim()).host ?: appLinkHost
+}
+
 android {
     namespace = "app.costsplit"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -41,13 +49,13 @@ android {
     buildTypes {
         debug {
             // Lets debug builds talk to a plain-http sync server on a laptop or LAN
-            manifestPlaceholders = [usesCleartextTraffic: "true"]
+            manifestPlaceholders = [usesCleartextTraffic: "true", appLinkHost: appLinkHost]
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // Release builds only talk https
-            manifestPlaceholders = [usesCleartextTraffic: "false"]
+            manifestPlaceholders = [usesCleartextTraffic: "false", appLinkHost: appLinkHost]
             if (keystoreFile.exists()) signingConfig signingConfigs.release
         }
     }

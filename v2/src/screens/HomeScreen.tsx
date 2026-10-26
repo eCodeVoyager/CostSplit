@@ -1,21 +1,25 @@
 import { useLiveQuery } from "dexie-react-hooks"
-import { ChevronRight, Link2, Plus, Share, Smartphone, UtensilsCrossed, WifiOff, Zap } from "lucide-react"
+import { ChevronRight, CloudOff, Link2, Plus, Share, Smartphone, UserRound, UtensilsCrossed, WifiOff, Zap } from "lucide-react"
 import { useState } from "react"
 import { useLocation } from "wouter"
 import { BalanceText } from "@/components/common"
+import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useBackClose } from "@/hooks/useBackClose"
 import { useInstall } from "@/hooks/useInstall"
+import { useSession } from "@/lib/auth"
 import { computeBalances, mealWeights } from "@/lib/balance"
 import { db, getKV, meKey } from "@/lib/db"
 import { parseInvite } from "@/lib/nav"
-import { isAndroidBrowser, publicOrigin } from "@/lib/server"
+import { hasServer, isAndroidBrowser, publicOrigin } from "@/lib/server"
 
 export function HomeScreen() {
   const [, navigate] = useLocation()
   const [joinOpen, setJoinOpen] = useState(false)
+  const session = useSession()
+  const signedOut = hasServer() && !session
 
   const trips = useLiveQuery(async () => {
     const all = (await db.trips.toArray()).filter((t) => !t.deleted)
@@ -56,9 +60,23 @@ export function HomeScreen() {
       </header>
 
       {trips.length === 0 ? (
-        <Welcome onNew={() => navigate("/new")} onJoin={() => setJoinOpen(true)} />
+        <Welcome onNew={() => navigate("/new")} onJoin={() => setJoinOpen(true)} signedOut={signedOut} />
       ) : (
         <>
+          {signedOut && (
+            <button
+              type="button"
+              onClick={() => openSignIn()}
+              className="mb-3 flex w-full items-center gap-3 rounded-2xl bg-negative-soft p-4 text-left text-negative active:opacity-80"
+            >
+              <CloudOff className="size-5 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="block font-semibold">Only on this phone</span>
+                <span className="block opacity-90">Sign in to sync with your flatmates and keep a copy safe.</span>
+              </span>
+              <ChevronRight className="size-5" aria-hidden />
+            </button>
+          )}
           <ul className="space-y-3">
             {trips.map(({ trip, people, count, me }) => (
               <li key={trip.id}>
@@ -100,11 +118,11 @@ export function HomeScreen() {
   )
 }
 
-function Welcome({ onNew, onJoin }: { onNew: () => void; onJoin: () => void }) {
+function Welcome({ onNew, onJoin, signedOut }: { onNew: () => void; onJoin: () => void; signedOut: boolean }) {
   const points = [
     { icon: Zap, title: "Bills every month", text: "Rent, electricity, internet, maid. Set once, tap Pay each month." },
     { icon: UtensilsCrossed, title: "Bazar by meals", text: "Mess-style meal count with a live meal rate. Or just split equally." },
-    { icon: WifiOff, title: "No signal, no account", text: "Saved on your phone first, syncs when online. Share one link to join." },
+    { icon: WifiOff, title: "Works with no signal", text: "Saved on your phone first, syncs when online. Share one link to join." },
   ]
   return (
     <div className="pt-6">
@@ -132,6 +150,16 @@ function Welcome({ onNew, onJoin }: { onNew: () => void; onJoin: () => void }) {
         <Button size="lg" variant="ghost" className="h-12 text-base" onClick={onJoin}>
           <Link2 /> I have an invite link
         </Button>
+        {signedOut && (
+          <Button
+            size="lg"
+            variant="ghost"
+            className="h-12 text-base"
+            onClick={() => openSignIn("Sign in with the email you used before to bring back your homes and trips.")}
+          >
+            <UserRound /> Sign in to restore my groups
+          </Button>
+        )}
       </div>
       <InstallCard />
     </div>
@@ -216,7 +244,7 @@ function JoinDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Join a trip</DialogTitle>
+          <DialogTitle>Join a home or trip</DialogTitle>
           <DialogDescription>Paste the invite link a friend sent you.</DialogDescription>
         </DialogHeader>
         <form
@@ -253,7 +281,7 @@ function JoinDialog({
           <Button type="submit" className="h-11 w-full" disabled={!value.trim()}>
             Join
           </Button>
-          <p className="text-center text-xs text-muted-foreground">No account needed. Needs internet once to download.</p>
+          <p className="text-center text-xs text-muted-foreground">Needs internet once to download. You'll sign in with your email.</p>
         </form>
       </DialogContent>
     </Dialog>

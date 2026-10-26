@@ -3,19 +3,23 @@ import {
   Download,
   FileJson,
   FileSpreadsheet,
+  LogOut,
   Pencil,
   RefreshCw,
   Smartphone,
   Trash2,
   Upload,
   UserPlus,
+  UserRound,
   UserRoundCheck,
   X,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import { UNDO_MS } from "@/lib/utils"
 import { useLocation } from "wouter"
 import { MemberAvatar, SectionTitle, Segmented } from "@/components/common"
+import { openSignIn } from "@/components/SignInSheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +37,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useInstall, useOnline } from "@/hooks/useInstall"
 import { useTrip } from "@/hooks/useTripData"
+import { endSession, useSession } from "@/lib/auth"
 import { CURRENCIES, currencyName, fetchRate } from "@/lib/currencies"
 import { timeAgo } from "@/lib/dates"
 import { rememberTrip } from "@/lib/nav"
@@ -48,8 +53,8 @@ import {
   updateTrip,
 } from "@/lib/repo"
 import { downloadFile, expensesCsv, fileSafe } from "@/lib/share"
-import { checkServer, getServerUrl, isNative, SYNC_BUILD_ENABLED } from "@/lib/server"
-import { changeServer, requestSync, useSyncState } from "@/lib/sync"
+import { hasServer, SYNC_BUILD_ENABLED } from "@/lib/server"
+import { leaveGroup, requestSync, useSyncState } from "@/lib/sync"
 import { useTheme, type Theme } from "@/lib/theme"
 import { APP_VERSION } from "@/lib/update"
 import type { GroupKind, Member } from "@/lib/types"
@@ -85,13 +90,17 @@ export default function SettingsTab() {
     setNewPerson("")
   }
 
+  const saveFailed = (err: unknown) =>
+    toast.error("Couldn't save the file", { description: err instanceof Error ? err.message : String(err) })
+
   const exportCsv = () => {
-    downloadFile(`${fileSafe(trip.name)}-expenses.csv`, expensesCsv(trip, everyone, expenses, mealWeights), "text/csv;charset=utf-8")
+    const csv = expensesCsv(trip, everyone, expenses, mealWeights)
+    downloadFile(`${fileSafe(trip.name)}-expenses.csv`, csv, "text/csv;charset=utf-8").catch(saveFailed)
   }
 
   const exportJson = async () => {
     const backup = await exportBackup(trip.id)
-    downloadFile(`${fileSafe(trip.name)}-backup.json`, JSON.stringify(backup), "application/json")
+    await downloadFile(`${fileSafe(trip.name)}-backup.json`, JSON.stringify(backup), "application/json").catch(saveFailed)
   }
 
   const restoreJson = async (file: File) => {
@@ -105,6 +114,8 @@ export default function SettingsTab() {
   }
 
   const removeTrip = async () => {
+    // Otherwise signing in on another phone would bring it back
+    await leaveGroup(trip.id).catch(() => {})
     await removeTripLocally(trip.id)
     rememberTrip(null)
     navigate("~/", { replace: true })
@@ -247,6 +258,7 @@ export default function SettingsTab() {
             ]}
           />
         </div>
+        <AccountRow />
         <SyncRow />
         <InstallRow />
         <p className="text-xs text-muted-foreground">CostSplit {APP_VERSION}</p>
@@ -294,7 +306,7 @@ function PersonRow({ member, isMe }: { member: Member; isMe: boolean }) {
       await setMemberArchived(member.id, true)
       toast(`${member.name} marked as moved out`, {
         description: "Their past expenses and balance stay. Settle up with them in Balances.",
-        action: { label: "Undo", onClick: () => setMemberArchived(member.id, false) },
+        duration: UNDO_MS, action: { label: "Undo", onClick: () => setMemberArchived(member.id, false) },
       })
       return
     }
@@ -456,23 +468,8 @@ function CurrencySettings({ hasExpenses }: { hasExpenses: boolean }) {
 
 function SyncRow() {
   const { status, lastSyncedAt, error } = useSyncState()
-  const [url, setUrl] = useState(getServerUrl())
-  const [checking, setChecking] = useState(false)
   if (!SYNC_BUILD_ENABLED) {
     return <p className="text-sm text-muted-foreground">Sync is off in this build: data stays on this phone.</p>
-  }
-
-  const changed = url.trim().replace(/\/+$/, "") !== getServerUrl()
-  const save = async () => {
-    setChecking(true)
-    const ok = url.trim() === "" ? !isNative : await checkServer(url)
-    setChecking(false)
-    if (!ok) {
-      toast.error("Can't reach that server", { description: "Check the address and that the server is running." })
-      return
-    }
-    await changeServer(url)
-    toast.success("Server saved, syncing all trips")
   }
 
   const text =
@@ -484,42 +481,55 @@ function SyncRow() {
           ? "Syncing…"
           : status === "error"
             ? `Sync problem: ${error ?? "unknown"}`
-            : lastSyncedAt
-              ? `Synced ${timeAgo(lastSyncedAt)}`
-              : "Not synced yet"
+            : status === "signedout"
+              ? "Off until you sign in"
+              : lastSyncedAt
+                ? `Synced ${timeAgo(lastSyncedAt)}`
+                : "Not synced yet"
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Sync</p>
-          <p className="truncate text-xs text-muted-foreground">{text}</p>
-        </div>
-        <Button variant="outline" className="h-10" onClick={() => requestSync(0)} disabled={status === "syncing" || status === "disabled"}>
-          <RefreshCw className={status === "syncing" ? "animate-spin" : undefined} /> Sync now
-        </Button>
+    <div className="flex items-center gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Sync</p>
+        <p className="truncate text-xs text-muted-foreground">{text}</p>
       </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          save()
-        }}
+      <Button
+        variant="outline"
+        className="h-10"
+        onClick={() => requestSync(0)}
+        disabled={status === "syncing" || status === "disabled" || status === "signedout"}
       >
-        <Input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={isNative ? "http://192.168.1.10:8787" : "Same as this website"}
-          inputMode="url"
-          autoCapitalize="off"
-          autoCorrect="off"
-          className="h-10 flex-1 text-sm"
-          aria-label="Sync server address"
-        />
-        <Button type="submit" variant="outline" className="h-10" disabled={!changed || checking}>
-          {checking ? "Checking…" : "Save"}
+        <RefreshCw className={status === "syncing" ? "animate-spin" : undefined} /> Sync now
+      </Button>
+    </div>
+  )
+}
+
+function AccountRow() {
+  const session = useSession()
+  if (!SYNC_BUILD_ENABLED || !hasServer()) return null
+
+  const signOut = async () => {
+    await endSession()
+    toast("Signed out", { description: "Everything stays on this phone. Sign in again to sync." })
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <UserRound className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Account</p>
+        <p className="truncate text-xs text-muted-foreground">{session ? session.user.email : "Not signed in"}</p>
+      </div>
+      {session ? (
+        <Button variant="outline" className="h-10" onClick={signOut}>
+          <LogOut /> Sign out
         </Button>
-      </form>
+      ) : (
+        <Button className="h-10" onClick={() => openSignIn()}>
+          Sign in
+        </Button>
+      )}
     </div>
   )
 }

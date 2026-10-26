@@ -1,13 +1,17 @@
-import { CircleAlert, WifiOff } from "lucide-react"
+import { CircleAlert, UserRound, WifiOff } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { useLocation } from "wouter"
 import { EmptyState, Splash } from "@/components/common"
+import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { useOnline } from "@/hooks/useInstall"
+import { useSession } from "@/lib/auth"
 import { isTripId } from "@/lib/nav"
-import { joinTrip, TripNotFoundError } from "@/lib/sync"
+import { joinTrip, SignedOutError, TripNotFoundError } from "@/lib/sync"
 
-type State = "joining" | "offline" | "notfound" | "error"
+type State = "joining" | "offline" | "notfound" | "signedout" | "error"
+
+const JOIN_REASON = "Sign in with your email to join. Then this group syncs on every phone you use."
 
 /**
  * Downloads a shared trip. `embedded` means we're already on /t/:id and the
@@ -16,6 +20,7 @@ type State = "joining" | "offline" | "notfound" | "error"
 export function JoinScreen({ id, embedded }: { id: string; embedded?: boolean }) {
   const [, navigate] = useLocation()
   const online = useOnline()
+  const session = useSession()
   const [state, setState] = useState<State>("joining")
 
   const run = useCallback(async () => {
@@ -26,13 +31,17 @@ export function JoinScreen({ id, embedded }: { id: string; embedded?: boolean })
       await joinTrip(id)
       if (!embedded) navigate(`~/t/${id}`, { replace: true })
     } catch (err) {
-      setState(err instanceof TripNotFoundError ? "notfound" : "error")
+      if (err instanceof SignedOutError) {
+        setState("signedout")
+        openSignIn(JOIN_REASON)
+      } else setState(err instanceof TripNotFoundError ? "notfound" : "error")
     }
   }, [id, embedded, navigate])
 
+  // Runs again right after signing in
   useEffect(() => {
     run()
-  }, [run])
+  }, [run, session])
 
   // Retry automatically when the connection comes back
   useEffect(() => {
@@ -53,6 +62,22 @@ export function JoinScreen({ id, embedded }: { id: string; embedded?: boolean })
         {state === "offline" && (
           <EmptyState icon={WifiOff} title="Connect once to join" action={home}>
             This trip isn't on your phone yet. Join with internet once, then it works offline.
+          </EmptyState>
+        )}
+        {state === "signedout" && (
+          <EmptyState
+            icon={UserRound}
+            title="Sign in to join"
+            action={
+              <div className="flex flex-col gap-2">
+                <Button size="lg" className="h-12" onClick={() => openSignIn(JOIN_REASON)}>
+                  Sign in with email
+                </Button>
+                {home}
+              </div>
+            }
+          >
+            Joining needs a free account, so the group stays in sync on every phone.
           </EmptyState>
         )}
         {state === "notfound" && (

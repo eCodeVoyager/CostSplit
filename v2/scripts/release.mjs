@@ -72,6 +72,39 @@ const info = {
 writeFileSync(path.join(out, "version.json"), JSON.stringify(info, null, 2))
 writeFileSync(path.join(out, "qr.svg"), renderSVG(`${publicUrl}/download/`, { border: 1, pixelSize: 8 }))
 
+// 4. App Links: invite links open the installed app once Android finds this key's fingerprint here
+let appLinks = false
+if (signed) {
+  const props = Object.fromEntries(
+    readFileSync(path.join(root, "android", "keystore.properties"), "utf8")
+      .split(/\r?\n/)
+      .filter((l) => l.includes("="))
+      .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()])
+  )
+  const keytools = [process.env.JAVA_HOME && path.join(process.env.JAVA_HOME, "bin", "keytool"), "keytool"].filter(Boolean)
+  for (const keytool of keytools) {
+    // The password goes through the environment, never the command line
+    const res = spawnSync(
+      keytool,
+      ["-list", "-v", "-keystore", path.join(root, "android", props.storeFile), "-alias", props.keyAlias, "-storepass:env", "COSTSPLIT_STOREPASS"],
+      { encoding: "utf8", env: { ...process.env, COSTSPLIT_STOREPASS: props.storePassword } }
+    )
+    const sha = res.stdout?.match(/SHA256:\s*([0-9A-F:]{95})/)?.[1]
+    if (!sha) continue
+    mkdirSync(path.join(root, "dist", ".well-known"), { recursive: true })
+    const statement = [
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: { namespace: "android_app", package_name: "app.costsplit", sha256_cert_fingerprints: [sha] },
+      },
+    ]
+    writeFileSync(path.join(root, "dist", ".well-known", "assetlinks.json"), JSON.stringify(statement, null, 2))
+    appLinks = true
+    break
+  }
+  if (!appLinks) console.warn("WARNING: couldn't read the release key with keytool; invite links will open in the browser, not the app")
+}
+
 console.log(`\nRelease ${version} ready in dist/ (APK ${(info.size / 1048576).toFixed(1)} MB)`)
 if (!signed) {
   console.warn(
@@ -79,4 +112,4 @@ if (!signed) {
       "for real users create a release key (see README) so updates install over each other."
   )
 }
-console.log("Upload with: npm run deploy:s3 (needs S3_BUCKET)")
+console.log("Deploy with: bash deploy/deploy.sh <ssh host> <domain>  (or npm run deploy:s3 for S3 + CloudFront)")

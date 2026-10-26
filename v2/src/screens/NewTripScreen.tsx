@@ -162,7 +162,19 @@ export default function NewTripScreen() {
               }}
               className="h-12"
             />
-            <Button type="button" variant="outline" className="h-12 px-4" onClick={addFriend} disabled={!friend.trim()} aria-label="Add person">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 px-4"
+              // Keep the name field focused (and the keyboard up) to add the next person
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                addFriend()
+                document.getElementById("friend")?.focus()
+              }}
+              disabled={!friend.trim()}
+              aria-label="Add person"
+            >
               <Plus />
             </Button>
           </div>

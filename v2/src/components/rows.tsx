@@ -60,7 +60,7 @@ export function ExpenseRow({
             {!involved
               ? "not involved"
               : mine > 0
-                ? `you ${income ? "get" : "lent"} ${formatMoney(mine, trip.currency)}`
+                ? `${income ? "you get" : loan ? "to get back" : "you lent"} ${formatMoney(mine, trip.currency)}`
                 : mine < 0
                   ? `you owe ${formatMoney(-mine, trip.currency)}`
                   : "even"}

@@ -1,5 +1,6 @@
-import { Cloud, CloudOff, RefreshCw, TriangleAlert } from "lucide-react"
+import { Cloud, CloudOff, RefreshCw, TriangleAlert, UserRound } from "lucide-react"
 import { toast } from "sonner"
+import { openSignIn } from "@/components/SignInSheet"
 import { timeAgo } from "@/lib/dates"
 import { requestSync, useSyncState } from "@/lib/sync"
 import { cn } from "@/lib/utils"
@@ -10,20 +11,35 @@ export function SyncBadge({ pending }: { pending: number }) {
   if (status === "disabled") return null
 
   const offline = status === "offline"
-  const label = offline
-    ? pending > 0
-      ? `${pending} saved offline`
-      : "Offline"
-    : status === "syncing"
-      ? "Syncing"
-      : status === "error"
-        ? "Sync issue"
-        : pending > 0
-          ? "Saving"
-          : "Synced"
-  const Icon = offline ? CloudOff : status === "syncing" ? RefreshCw : status === "error" ? TriangleAlert : Cloud
+  const signedOut = status === "signedout"
+  const label = signedOut
+    ? "Sign in to sync"
+    : offline
+      ? pending > 0
+        ? `${pending} saved offline`
+        : "Offline"
+      : status === "syncing"
+        ? "Syncing"
+        : status === "error"
+          ? "Sync issue"
+          : pending > 0
+            ? "Saving"
+            : "Synced"
+  const Icon = signedOut
+    ? UserRound
+    : offline
+      ? CloudOff
+      : status === "syncing"
+        ? RefreshCw
+        : status === "error"
+          ? TriangleAlert
+          : Cloud
 
   const onClick = () => {
+    if (signedOut) {
+      openSignIn("Your changes are only on this phone. Sign in to sync them and share this group.")
+      return
+    }
     if (offline) {
       toast("You're offline", {
         description: "Everything is saved on this phone and will sync when you're back online.",
@@ -41,7 +57,7 @@ export function SyncBadge({ pending }: { pending: number }) {
       onClick={onClick}
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium",
-        offline || status === "error" ? "bg-negative-soft text-negative" : "bg-secondary text-secondary-foreground"
+        offline || status === "error" || signedOut ? "bg-negative-soft text-negative" : "bg-secondary text-secondary-foreground"
       )}
       aria-label={`Sync status: ${label}`}
     >

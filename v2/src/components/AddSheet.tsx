@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useMemo } from "react"
 import { toast } from "sonner"
+import { UNDO_MS } from "@/lib/utils"
 import { useLocation } from "wouter"
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
 import { useBackClose } from "@/hooks/useBackClose"
@@ -127,7 +128,7 @@ export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
     const id = await saveExpense(trip.id, { ...copy, date: toISODate() })
     navigator.vibrate?.(15)
     toast.success(`Added ${e.title} ${formatMoney(e.amount, e.currency)}`, {
-      action: { label: "Undo", onClick: () => softDelete("expenses", id) },
+      duration: UNDO_MS, action: { label: "Undo", onClick: () => softDelete("expenses", id) },
     })
   }
 

@@ -2,6 +2,7 @@ import { ArrowRight, CircleCheck, HandCoins, ImageIcon, Plus, Share2, Trash2 } f
 import { useState } from "react"
 import { PhotoViewer } from "@/components/PhotoField"
 import { toast } from "sonner"
+import { cn, UNDO_MS } from "@/lib/utils"
 import { BalanceText, EmptyState, MemberAvatar, SectionTitle } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { useTrip } from "@/hooks/useTripData"
@@ -9,7 +10,6 @@ import { shortDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import { restore, softDelete } from "@/lib/repo"
 import { settleUpText, shareOrCopy } from "@/lib/share"
-import { cn } from "@/lib/utils"
 import { useTripActions } from "@/hooks/useTripActions"
 
 export function BalancesTab() {
@@ -45,7 +45,7 @@ export function BalancesTab() {
 
   const removePayment = async (id: string) => {
     await softDelete("payments", id)
-    toast("Payment removed", { action: { label: "Undo", onClick: () => restore("payments", id) } })
+    toast("Payment removed", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("payments", id) } })
   }
 
   return (

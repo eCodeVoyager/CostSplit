@@ -1,6 +1,6 @@
 # CostSplit v2
 
-Shared money for people who live together (3-4 flatmates, a mess, family), with trips as a side mode. Android app + installable web app, works with no signal, syncs when back online. No accounts: share a link, the others join.
+Shared money for people who live together (3-4 flatmates, a mess, family), with trips as a side mode. Android app + installable web app, works with no signal, syncs when back online. Sign in with an email code (no password), share a link, the others join.
 
 ## What a home can do
 
@@ -26,7 +26,7 @@ Trips use the same app with travel defaults (EUR, food/taxi/ferry chips, no bill
 |---|---|---|
 | Backend | Express + MongoDB + JWT | One zero-dependency Node file, one JSON file per group |
 | Data | Server only, online required | On the phone first (IndexedDB), synced in the background |
-| Access | One shared username/password | Invite link per group, no login |
+| Access | One shared username/password | Email code sign-in (no password) + invite link per group |
 | App | Website | Android app (APK) + installable web app |
 | Scope | One group, one-off expenses | Homes and trips; bills, meals, to-buy list, loans, money in |
 | Money math | Floats rounded to 2 dp | Integer cents, totals always add up exactly |
@@ -64,7 +64,7 @@ npm run server      # keep running
 npm run phone       # adb reverse :8787, install APK, launch
 ```
 
-`.env.android` points the app at `http://localhost:8787`, which `adb reverse` maps to this computer, so it works over USB without Wi-Fi setup. To test without the cable, open **Trip → App → Sync server** in the app and enter `http://<computer-LAN-IP>:8787` (same Wi-Fi; allow port 8787 through the firewall). The server address can be changed in-app any time; the app re-uploads everything to the new server.
+`.env.android` points the app at `http://localhost:8787`, which `adb reverse` maps to this computer, so it works over USB without Wi-Fi setup. The server address is fixed per build and can't be changed in the app. To test without the cable, set `VITE_SERVER_URL=http://<computer-LAN-IP>:8787` in `.env.android` and rebuild (same Wi-Fi; allow port 8787 through the firewall).
 
 Debug the app's WebView from desktop Chrome at `chrome://inspect`.
 
@@ -182,4 +182,4 @@ Each row (group, member, expense, payment, bill, meal count, list item) has a cl
 
 Meal counts use one row per person per day, so two phones counting different people never overwrite each other.
 
-**The group id in the invite link is the access key**: anyone with the link can read and edit that group. Treat it like a shared password.
+**The group id in the invite link is the access key**: anyone with the link who signs in (any email works) can read and edit that group. Treat it like a shared password.
