@@ -1,5 +1,4 @@
-import { useLiveQuery } from "dexie-react-hooks"
-import { ChevronRight, CloudOff, Link2, Plus, Share, Smartphone, UserRound, UtensilsCrossed, WifiOff, Zap } from "lucide-react"
+import { Bell, ChevronRight, CloudOff, HandCoins, Link2, ListChecks, Plus, Share, Siren, Smartphone, UserRound, UtensilsCrossed, WifiOff, Zap, type LucideIcon } from "lucide-react"
 import { useState } from "react"
 import { useLocation } from "wouter"
 import { BalanceText } from "@/components/common"
@@ -9,10 +8,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { useBackClose } from "@/hooks/useBackClose"
 import { useInstall } from "@/hooks/useInstall"
+import { useAllGroups, type GroupSummary } from "@/hooks/useAllGroups"
 import { useSession } from "@/lib/auth"
-import { computeBalances, mealWeights } from "@/lib/balance"
-import { db, getKV, meKey } from "@/lib/db"
+import { monthLabel, shortDate, toISODate } from "@/lib/dates"
+import { formatMoney } from "@/lib/money"
 import { parseInvite } from "@/lib/nav"
+import { cn } from "@/lib/utils"
 import { hasServer, isAndroidBrowser, publicOrigin } from "@/lib/server"
 
 export function HomeScreen() {
@@ -21,31 +22,7 @@ export function HomeScreen() {
   const session = useSession()
   const signedOut = hasServer() && !session
 
-  const trips = useLiveQuery(async () => {
-    const all = (await db.trips.toArray()).filter((t) => !t.deleted)
-    const rows = await Promise.all(
-      all.map(async (trip) => {
-        const [members, expenses, payments, meals, meId] = await Promise.all([
-          db.members.where("tripId").equals(trip.id).toArray(),
-          db.expenses.where("tripId").equals(trip.id).toArray(),
-          db.payments.where("tripId").equals(trip.id).toArray(),
-          db.meals.where("tripId").equals(trip.id).toArray(),
-          getKV<string | null>(meKey(trip.id), null),
-        ])
-        const live = expenses.filter((e) => !e.deleted)
-        const balances = computeBalances(trip, members, live, payments.filter((p) => !p.deleted), mealWeights(meals))
-        const lastActivity = Math.max(trip.updatedAt, ...live.map((e) => e.updatedAt))
-        return {
-          trip,
-          people: members.filter((m) => !m.deleted).length,
-          count: live.length,
-          me: balances.find((b) => b.memberId === meId),
-          lastActivity,
-        }
-      })
-    )
-    return rows.sort((a, b) => b.lastActivity - a.lastActivity)
-  })
+  const trips = useAllGroups()
 
   if (trips === undefined) return null
 
@@ -77,8 +54,10 @@ export function HomeScreen() {
               <ChevronRight className="size-5" aria-hidden />
             </button>
           )}
+          <Dashboard groups={trips} open={(url) => navigate(url)} />
+          <h2 className="px-1 pt-5 pb-2 text-sm font-semibold text-muted-foreground">Your homes and trips</h2>
           <ul className="space-y-3">
-            {trips.map(({ trip, people, count, me }) => (
+            {trips.map(({ trip, people, count, me, unread, billStatus }) => (
               <li key={trip.id}>
                 <button
                   type="button"
@@ -96,6 +75,7 @@ export function HomeScreen() {
                     </p>
                     {me && count > 0 && <BalanceText net={me.net} currency={trip.currency} you className="text-sm" />}
                   </div>
+                  <GroupBadges unread={unread} due={billStatus.filter((b) => !b.paid && b.due <= toISODate()).length} />
                   <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
                 </button>
               </li>
@@ -285,5 +265,132 @@ function JoinDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function GroupBadges({ unread, due }: { unread: number; due: number }) {
+  if (!unread && !due) return null
+  return (
+    <span className="flex flex-col items-end gap-1">
+      {due > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-negative-soft px-2 py-0.5 text-[11px] font-medium text-negative">
+          <Zap className="size-3" aria-hidden /> {due} due
+        </span>
+      )}
+      {unread > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
+          <Bell className="size-3" aria-hidden /> {unread} new
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * Everything at a glance across all groups: what I spent this month (my share
+ * plus personal), what I owe or get back, and what needs me right now.
+ */
+function Dashboard({ groups, open }: { groups: GroupSummary[]; open: (url: string) => void }) {
+  const today = toISODate()
+  const month = today.slice(0, 7)
+
+  // Different groups can use different currencies: never add them together
+  const byCurrency = new Map<string, { spent: number; shared: number; personal: number; get: number; owe: number; groups: number }>()
+  for (const g of groups) {
+    const c = byCurrency.get(g.trip.currency) ?? { spent: 0, shared: 0, personal: 0, get: 0, owe: 0, groups: 0 }
+    c.spent += g.month.total
+    c.shared += g.month.shared
+    c.personal += g.month.personal
+    if (g.me && g.me.net > 0) c.get += g.me.net
+    if (g.me && g.me.net < 0) c.owe -= g.me.net
+    c.groups++
+    byCurrency.set(g.trip.currency, c)
+  }
+
+  const todo: { key: string; icon: LucideIcon; text: string; sub: string; url: string; warn?: boolean }[] = []
+  for (const g of groups) {
+    const money = (v: number) => formatMoney(v, g.trip.currency)
+    const base = `/t/${g.trip.id}`
+    for (const st of g.billStatus) {
+      if (st.paid || st.due > today) continue
+      todo.push({
+        key: `bill:${st.bill.id}:${st.period}`,
+        icon: Zap,
+        text: `${st.bill.title} ${st.due < today ? `overdue since ${shortDate(st.due)}` : "due today"}`,
+        sub: g.trip.name,
+        url: `${base}/bills`,
+        warn: true,
+      })
+    }
+    for (const t of g.iOwe) {
+      todo.push({ key: `owe:${g.trip.id}:${t.to}`, icon: HandCoins, text: `Pay ${g.names.get(t.to) ?? "?"} ${money(t.amount)}`, sub: g.trip.name, url: `${base}/balances` })
+    }
+    for (const i of g.urgentFree) {
+      todo.push({ key: `urgent:${i.id}`, icon: Siren, text: `Urgent: ${i.name}, nobody's buying it`, sub: g.trip.name, url: `${base}/list`, warn: true })
+    }
+    if (g.toBuy.length) {
+      const pressing = g.toBuy.some((i) => i.urgent || (i.needBy && i.needBy <= today))
+      todo.push({
+        key: `buy:${g.trip.id}`,
+        icon: ListChecks,
+        text: `You're buying ${g.toBuy.length === 1 ? g.toBuy[0].name : `${g.toBuy.length} items`}${pressing ? " · needed now" : ""}`,
+        sub: g.trip.name,
+        url: `${base}/list`,
+        warn: pressing,
+      })
+    }
+    if (g.unread) {
+      todo.push({ key: `new:${g.trip.id}`, icon: Bell, text: `${g.unread} ${g.unread === 1 ? "update" : "updates"} from others`, sub: g.trip.name, url: `${base}?inbox` })
+    }
+  }
+
+  return (
+    <section aria-label="Dashboard" className="space-y-3">
+      {[...byCurrency.entries()].map(([currency, c]) => (
+        <div key={currency} className="rounded-2xl bg-primary p-4 text-primary-foreground shadow-sm">
+          <p className="text-sm opacity-80">
+            You spent in {monthLabel(month)}
+            {byCurrency.size > 1 ? ` · ${currency}` : ""}
+          </p>
+          <p className="mt-0.5 text-3xl font-bold tabular">{formatMoney(c.spent, currency)}</p>
+          <p className="text-xs opacity-80 tabular">
+            {formatMoney(c.shared, currency)} your share + {formatMoney(c.personal, currency)} personal · {c.groups}{" "}
+            {c.groups === 1 ? "group" : "groups"}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-primary-foreground/15 px-3 py-2">
+              <p className="text-xs opacity-80">You get back</p>
+              <p className="font-semibold tabular">{formatMoney(c.get, currency)}</p>
+            </div>
+            <div className="rounded-xl bg-primary-foreground/15 px-3 py-2">
+              <p className="text-xs opacity-80">You owe</p>
+              <p className="font-semibold tabular">{formatMoney(c.owe, currency)}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {todo.length > 0 && (
+        <div>
+          <h2 className="px-1 pb-2 text-sm font-semibold text-muted-foreground">Needs you</h2>
+          <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
+            {todo.slice(0, 8).map((t) => (
+              <li key={t.key}>
+                <button type="button" onClick={() => open(t.url)} className="flex min-h-13 w-full items-center gap-3 px-3 py-2 text-left active:bg-accent">
+                  <span className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-xl", t.warn ? "bg-negative-soft text-negative" : "bg-accent text-accent-foreground")}>
+                    <t.icon className="size-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{t.text}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{t.sub}</span>
+                  </span>
+                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   )
 }

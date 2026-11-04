@@ -1,7 +1,8 @@
 {
   "name": "costsplit-v2",
   "private": true,
-  "version": "2.0.3",
+  "version": "2.1.0",
+  "minAppVersion": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +11,7 @@
     "start": "npm run build && npm run server",
     "preview": "vite preview",
     "test": "vitest run && node --test server/server.test.mjs",
+    "e2e": "vite build --mode e2e --outDir dist-e2e && playwright test",
     "icons": "pwa-assets-generator",
     "build:android": "tsc -b && vite build --mode android --outDir dist-android && cap sync android",
     "apk": "npm run build:android && node scripts/gradle.mjs assembleDebug",
@@ -22,6 +24,7 @@
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -39,6 +42,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

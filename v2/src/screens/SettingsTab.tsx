@@ -53,10 +53,12 @@ import {
   updateTrip,
 } from "@/lib/repo"
 import { downloadFile, expensesCsv, fileSafe } from "@/lib/share"
-import { hasServer, SYNC_BUILD_ENABLED } from "@/lib/server"
+import { hasServer, isNative, SYNC_BUILD_ENABLED } from "@/lib/server"
 import { leaveGroup, requestSync, useSyncState } from "@/lib/sync"
+import { notifyPermission, requestNotifyPermission, showNow, type NotifyPermission } from "@/lib/notify"
+import { setPref, usePrefs } from "@/lib/review"
 import { useTheme, type Theme } from "@/lib/theme"
-import { APP_VERSION } from "@/lib/update"
+import { APP_VERSION, checkForUpdate, useUpdate } from "@/lib/update"
 import type { GroupKind, Member } from "@/lib/types"
 import { TRIP_EMOJIS } from "@/lib/categories"
 import { useTripActions } from "@/hooks/useTripActions"
@@ -66,6 +68,7 @@ export default function SettingsTab() {
   const label = kind === "home" ? "home" : "trip"
   const { invite, changeMe } = useTripActions()
   const [theme, setTheme] = useTheme()
+  const prefs = usePrefs()
   const [, navigate] = useLocation()
   const [name, setName] = useState(trip.name)
   const [newPerson, setNewPerson] = useState("")
@@ -258,10 +261,20 @@ export default function SettingsTab() {
             ]}
           />
         </div>
+        <label className="flex items-center gap-3">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Check before saving</span>
+            <span className="block text-xs text-muted-foreground">
+              Show a summary (amount, who paid, each share, who owes whom) to confirm before anything is added. This phone only.
+            </span>
+          </span>
+          <Switch checked={prefs.review} onCheckedChange={(v) => setPref("review", v)} aria-label="Check before saving" />
+        </label>
+        <NotificationRows />
         <AccountRow />
         <SyncRow />
         <InstallRow />
-        <p className="text-xs text-muted-foreground">CostSplit {APP_VERSION}</p>
+        <UpdateRow />
       </div>
 
       <SectionTitle>Danger zone</SectionTitle>
@@ -550,6 +563,110 @@ function InstallRow() {
         <Button className="h-10" onClick={install}>
           Install
         </Button>
+      )}
+    </div>
+  )
+}
+
+/** Device notifications: others' changes, and reminders scheduled on the phone */
+function NotificationRows() {
+  const prefs = usePrefs()
+  const [perm, setPerm] = useState<NotifyPermission | null>(null)
+  useEffect(() => {
+    notifyPermission().then(setPerm).catch(() => setPerm("unsupported"))
+  }, [])
+
+  const enable = async (key: "notifyActivity" | "notifyReminders", on: boolean) => {
+    setPref(key, on)
+    if (on && perm === "prompt") {
+      const granted = await requestNotifyPermission().catch(() => false)
+      setPerm(granted ? "granted" : "denied")
+    }
+  }
+
+  const test = async () => {
+    if (perm !== "granted") {
+      const granted = await requestNotifyPermission().catch(() => false)
+      setPerm(granted ? "granted" : "denied")
+      if (!granted) return
+    }
+    await showNow("CostSplit notifications work", "You'll hear about bills, meals and changes that involve you.", "/", "test")
+    toast.success("Test notification sent")
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <label className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Tell me about changes</span>
+          <span className="block text-xs text-muted-foreground">When someone adds, edits or deletes an expense or payment you're in, or asks you to buy something.</span>
+        </span>
+        <Switch checked={prefs.notifyActivity} onCheckedChange={(v) => enable("notifyActivity", v)} aria-label="Tell me about changes" />
+      </label>
+      <label className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Reminders</span>
+          <span className="block text-xs text-muted-foreground">
+            Bill due days, tonight's meal count, and a Friday nudge if you owe. Set on the phone, so they come even when the app is closed.
+          </span>
+        </span>
+        <Switch checked={prefs.notifyReminders} onCheckedChange={(v) => enable("notifyReminders", v)} aria-label="Reminders" />
+      </label>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {perm === "granted"
+            ? "Notifications are allowed on this device."
+            : perm === "denied"
+              ? "Notifications are blocked. Allow them in the phone's settings for CostSplit."
+              : perm === "unsupported"
+                ? "This browser can't show notifications. Updates still appear under the bell."
+                : "You'll be asked to allow notifications."}
+        </span>
+        {perm !== "unsupported" && perm !== "denied" && (
+          <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={test}>
+            Send a test
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Version, "Check for updates" and automatic downloads (Android app; the website updates by itself) */
+function UpdateRow() {
+  const prefs = usePrefs()
+  const { state } = useUpdate()
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm">
+          <span className="block font-medium">CostSplit {APP_VERSION}</span>
+          <span className="block text-xs text-muted-foreground">
+            {!isNative
+              ? "The web app updates by itself."
+              : state.status === "ready"
+                ? `${state.info.version} downloaded, ready to install`
+                : state.status === "downloading"
+                  ? `Downloading ${state.info.version}… ${state.percent}%`
+                  : state.status === "available"
+                    ? `${state.info.version} is available`
+                    : "Updates are checked automatically."}
+          </span>
+        </span>
+        {isNative && (
+          <Button variant="outline" size="sm" className="h-9 shrink-0" disabled={state.status === "checking"} onClick={() => checkForUpdate({ manual: true })}>
+            {state.status === "checking" ? "Checking…" : state.status === "ready" || state.status === "available" ? "Update" : "Check for updates"}
+          </Button>
+        )}
+      </div>
+      {isNative && (
+        <label className="flex items-center gap-3">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Download updates automatically</span>
+            <span className="block text-xs text-muted-foreground">New versions download in the background; you tap Install when it suits you.</span>
+          </span>
+          <Switch checked={prefs.autoUpdate} onCheckedChange={(v) => setPref("autoUpdate", v)} aria-label="Download updates automatically" />
+        </label>
       )}
     </div>
   )

@@ -1,5 +1,6 @@
 import { Check, ChevronRight, Plus, Receipt, UserPlus, Zap } from "lucide-react"
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import { Link } from "wouter"
 import { CategoryIcon, EmptyState, SectionTitle } from "@/components/common"
 import { MealStepper } from "@/components/MealStepper"
@@ -12,7 +13,8 @@ import { expenseImpact, isSpending } from "@/lib/balance"
 import { monthLabel, shortDate, toISODate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import { summarizeMonth } from "@/lib/month"
-import { addItem, setItemDone } from "@/lib/repo"
+import { addItem, byNeed, setItemDone } from "@/lib/repo"
+import { NeedBadges } from "./ShoppingScreen"
 import { cn } from "@/lib/utils"
 
 /** The group's front page: what needs doing today, at a glance */
@@ -179,13 +181,17 @@ function MealsCard({ rate, totalMeals }: { rate: number; totalMeals: number }) {
 }
 
 function ListCard() {
-  const { trip, items } = useTrip()
+  const { trip, items, meId, names } = useTrip()
   const [name, setName] = useState("")
-  const open = items.filter((i) => !i.done)
+  const open = items.filter((i) => !i.done).sort(byNeed)
   const add = async () => {
     const trimmed = name.trim()
     if (!trimmed) return
-    await addItem(trip.id, trimmed.slice(0, 60))
+    const existing = await addItem(trip.id, trimmed.slice(0, 60), meId)
+    if (existing) {
+      const buyer = existing.assignee ? ` · ${existing.assignee === meId ? "you're" : `${names.get(existing.assignee)} is`} buying it` : ""
+      toast(`${existing.name} is already on the list${buyer}`)
+    }
     setName("")
   }
   return (
@@ -218,11 +224,17 @@ function ListCard() {
             type="button"
             role="checkbox"
             aria-checked={false}
-            onClick={() => setItemDone(item.id, true)}
+            onClick={() => setItemDone(item.id, true, meId)}
             className="flex min-h-11 w-full items-center gap-3 border-t px-3 text-left text-sm active:bg-accent"
           >
-            <span className="size-5 rounded-full border-2 border-input" aria-hidden />
-            {item.name}
+            <span className="size-5 shrink-0 rounded-full border-2 border-input" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{item.name}</span>
+            <NeedBadges item={item} />
+            {item.assignee && (
+              <span className={cn("shrink-0 text-xs", item.assignee === meId ? "font-medium text-primary" : "text-muted-foreground")}>
+                {item.assignee === meId ? "you're buying" : names.get(item.assignee)}
+              </span>
+            )}
           </button>
         ))}
         {open.length > 4 && (
@@ -237,7 +249,7 @@ function ListCard() {
 
 function RecentCard() {
   const { trip, expenses, mealWeights } = useTrip()
-  const { editExpense } = useTripActions()
+  const { viewExpense } = useTripActions()
   const recent = expenses.slice(0, 5)
   if (recent.length === 0) return null
   return (
@@ -256,7 +268,7 @@ function RecentCard() {
           const impact = expenseImpact(e, trip, mealWeights)
           return (
             <li key={e.id}>
-              <ExpenseRow expense={e} paid={impact.paid} owed={impact.owed} onClick={() => editExpense(e)} />
+              <ExpenseRow expense={e} paid={impact.paid} owed={impact.owed} onClick={() => viewExpense(e)} />
             </li>
           )
         })}

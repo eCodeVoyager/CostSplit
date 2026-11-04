@@ -1,0 +1,15 @@
+{
+  "2.1.0": {
+    "title": "Personal spending, safer adding, a smarter to-buy list",
+    "notes": [
+      "Personal tab: your own expenses, private to you. Your total includes your share of the home.",
+      "Check before saving: see the amount, who paid, each share and who owes whom before anything is added.",
+      "Amounts fill themselves in: type what some people owe or paid, the rest is shared equally.",
+      "To-buy list: tap “I'll buy” or assign someone, mark urgent or needed by a day. The buyer gets a reminder.",
+      "Updates bell and a dashboard: what others changed, what needs you, what you spent this month.",
+      "Reminders on your phone for bills, tonight's meals and things you're buying.",
+      "Tap any expense for its full split and history, or a person for their statement.",
+      "More filters in Activity. Bills, meals, list and settings are now under the grid icon at the top."
+    ]
+  }
+}

@@ -85,7 +85,8 @@ export default function NewTripScreen() {
     })
     navigate(`/t/${id}`, { replace: true })
     toast.success(kind === "home" ? "Home created" : "Trip created", {
-      description: "Invite the others with the person button at the top.",
+      description: "Send the others a link so they can join.",
+      action: { label: "Invite", onClick: () => navigate(`/t/${id}?invite`) },
     })
   }
 

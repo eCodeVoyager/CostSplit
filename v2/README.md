@@ -9,14 +9,22 @@ Shared money for people who live together (3-4 flatmates, a mess, family), with 
 | Rent, electricity, gas, water, internet, maid | **Monthly bills**: set once (fixed or "changes every month", due day, everyone / some / fixed amount per person for rent by room). Home shows what's due or overdue; **Pay** opens a prefilled expense. |
 | Shared bazar in a mess | **Meal count**: daily meal steppers (½ meals too, "same as day before"). Bazar split **by meals** uses that month's counts; live meal rate in the Meal book. |
 | Daily repeat costs | **Add again today**: re-add a recent expense with one tap. Quick chips (Bazar, Vegetables, Gas cylinder, Drinking water…) and auto category from words like *bazar, sabji, current bill, bua*. |
-| "We need rice, oil, soap" | **To-buy list** shared by everyone; tick what you bought, then turn it into one expense. |
+| "We need rice, oil, soap" | **To-buy list** shared by everyone. "I'll buy" or assign someone so nothing is bought twice (adding something already on the list is blocked), mark **urgent** or **needed by** a day, tick what you bought, then turn it into one expense; the items stay attached to the bazar expense. |
 | Manager fund / paying back | **Give money** records cash between two people (deposits, settling up). |
 | Flatmate borrows money | **Lend**: only the borrower owes it. Kept out of spending totals. |
 | Landlord refund, sold old newspapers | **Money in**: income shared by everyone, flips who owes whom. |
 | Someone moves out / moves in | Moved-out people keep their history and balance until settled; new people join future bills automatically. |
 | Month end | **Insights** per month: spent, per day, your share, meal rate, categories, paid vs share, plus a shareable month report. |
 
-Also: edit anything, undo on delete, several payers, split equally / by shares / exact amounts / by meals, multi-currency, settle-up suggestions, CSV export, JSON backup, dark mode.
+| My own spending (lunch, phone recharge) | **Personal** tab: private expenses only you see (the server sends them to your account only). Your total = your share of the home + personal, by category and month. Never touches group balances. |
+| "Wait, why do I owe Rafi?" | **Statements**: tap anyone in Balances for every item that moved their balance, a running total and the sum written out. Tap any expense for its full split, who owes whom and its history (added / edited / deleted by whom). |
+| Mistyped amount or wrong payer | **Check before saving**: a summary to confirm before anything is added (amounts, each share, who owes whom, balances after a payment) plus warnings for likely duplicates, future dates, unusually big amounts, and splits that change nobody's balance. On by default, per phone. |
+| Uneven splits ("I had less") | **Amounts fill themselves in**: type what some people owe (or paid) and everyone left blank shares the rest equally; the last person absorbs a changed total. Repeat titles offer "Split like last time". |
+| "Did anything change?" | **Updates** (bell): others' new, edited and deleted expenses, payments, items assigned to you, urgent items, plus what needs you now. **Dashboard** on the first screen: what you spent this month across groups, what you owe / get back, bills due, things to buy. |
+| Not forgetting | **Notifications** (Android app, set on the phone so they come with the app closed): bill due days, overdue bills, the buyer's to-buy items on the day they're needed, tonight's meal count, a Friday nudge if you owe. Changes by others that involve you notify when they sync in. |
+| Finding one expense among hundreds | **Filters**: type, people (any one / all of them / only them, paid or shared), your part (I owe, I get back), category, date range, amount range, photo, note, several payers, edited; sort by date or amount; totals and CSV export for what's shown; recently deleted with restore. |
+
+Also: edit anything, undo on delete, several payers ("Rest" fills what's left), split equally / by shares / exact amounts / by meals, live "who owes whom" for any number of people, settle up by fewest payments or direct debts, reminders, multi-currency, CSV export, JSON backup, dark mode.
 
 Trips use the same app with travel defaults (EUR, food/taxi/ferry chips, no bills or meals).
 
@@ -181,5 +189,7 @@ bash deploy/deploy.sh s3 costsplit.tapspot.tech
 Each row (group, member, expense, payment, bill, meal count, list item) has a client-generated UUID and `updatedAt`. Local edits are marked `dirty`. `POST /api/sync` pushes dirty rows and pulls everything after the device's cursor (a per-trip sequence number). Conflicts resolve last-write-wins per row. Deletes are soft (`deleted: 1`), so they sync and can be undone. Balances are computed on the device, so they're instant and work offline.
 
 Meal counts use one row per person per day, so two phones counting different people never overwrite each other.
+
+Personal expenses sync in the same group file but are owner-only: the server stamps each one with the signing-in account, never returns it to anyone else and ignores writes to it from other accounts. Deploy the server before (or with) a client that has the Personal tab: an older server rejects the new `personal` table and that group stops syncing until it's updated.
 
 **The group id in the invite link is the access key**: anyone with the link who signs in (any email works) can read and edit that group. Treat it like a shared password.

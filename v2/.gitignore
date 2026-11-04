@@ -9,3 +9,8 @@ dist-android
 .env.android-release
 *.jks
 *.keystore
+# End-to-end tests
+dist-e2e
+e2e/.data
+test-results
+playwright-report

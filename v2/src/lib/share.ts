@@ -1,6 +1,6 @@
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem"
 import { Share } from "@capacitor/share"
-import type { Transfer } from "./balance"
+import type { ExpenseImpact, Transfer } from "./balance"
 import { expenseImpact, type MealWeights } from "./balance"
 import { getCategory } from "./categories"
 import { formatMoney, toMajor } from "./money"
@@ -41,6 +41,20 @@ export function settleUpText(trip: Trip, transfers: Transfer[], names: Map<strin
     (t) => `• ${names.get(t.from) ?? "?"} → ${names.get(t.to) ?? "?"}: ${formatMoney(t.amount, trip.currency)}`
   )
   return `${trip.emoji} ${trip.name} — settle up\n${lines.join("\n")}`
+}
+
+/** One expense in words, for the group chat: who paid, the split and who owes whom */
+export function expenseText(trip: Trip, e: Expense, impact: ExpenseImpact, transfers: Transfer[], names: Map<string, string>) {
+  const money = (v: number) => formatMoney(Math.abs(v), trip.currency)
+  const name = (id: string) => names.get(id) ?? "?"
+  const lines = [`${e.title}: ${formatMoney(e.amount, e.currency)} (${e.date})`]
+  lines.push(`${e.kind === "income" ? "Received by" : "Paid by"} ${Object.keys(e.paidBy).map(name).join(" + ")}`)
+  lines.push(`Split: ${Object.entries(impact.owed).map(([id, v]) => `${name(id)} ${money(v)}`).join(", ")}`)
+  if (transfers.length) {
+    lines.push("", "Who owes whom:")
+    transfers.forEach((t) => lines.push(`• ${name(t.from)} → ${name(t.to)}: ${money(t.amount)}`))
+  }
+  return lines.join("\n")
 }
 
 /** Month-end summary for the group chat */

@@ -1,6 +1,6 @@
 export type ID = string
 
-export type TableName = "trips" | "members" | "expenses" | "payments" | "bills" | "meals" | "items"
+export type TableName = "trips" | "members" | "expenses" | "payments" | "bills" | "meals" | "items" | "personal"
 
 /** Fields shared by every synced row. `dirty` is local-only (not yet pushed). */
 export interface Row {
@@ -64,6 +64,11 @@ export interface Expense extends Row {
   period?: string
   /** Photo of the receipt (file id) */
   receipt?: ID
+  /** Member who added it, and who changed it last (shown as the item's history) */
+  createdBy?: ID
+  updatedBy?: ID
+  /** What was bought (bazar items), e.g. from the to-buy list */
+  items?: string[]
 }
 
 export interface Payment extends Row {
@@ -75,6 +80,8 @@ export interface Payment extends Row {
   note?: string
   /** Photo proving the payment, e.g. a bKash/bank screenshot (file id) */
   proof?: ID
+  createdBy?: ID
+  updatedBy?: ID
 }
 
 /** A monthly bill template (rent, electricity, internet, maid...) */
@@ -105,6 +112,37 @@ export interface Meal extends Row {
 export interface ShopItem extends Row {
   name: string
   done: 0 | 1
+  /** Who is going to buy it ("I'll buy"), so two people don't buy the same thing */
+  assignee?: ID
+  /** Who set the assignee (someone else assigning you shows up in your updates) */
+  assignedBy?: ID
+  createdBy?: ID
+  /** Who ticked it as bought */
+  boughtBy?: ID
+  /** Needed right away (gas ran out, no rice for dinner) */
+  urgent?: 0 | 1
+  updatedBy?: ID
+  /** Needed by this day, YYYY-MM-DD */
+  needBy?: string
 }
 
-export type AnyRow = Trip | Member | Expense | Payment | Bill | Meal | ShopItem
+/**
+ * Something only you paid for and only you consume (your own lunch, phone bill).
+ * Never part of group balances. The server sends it to its owner's devices only.
+ */
+export interface PersonalExpense extends Row {
+  title: string
+  category: string
+  /** Minor units in `currency` */
+  amount: number
+  currency: string
+  /** Units of `currency` per 1 unit of the group's base currency */
+  rate: number
+  /** YYYY-MM-DD */
+  date: string
+  note?: string
+  /** Account id of the owner, set by the server */
+  owner?: string
+}
+
+export type AnyRow = Trip | Member | Expense | Payment | Bill | Meal | ShopItem | PersonalExpense

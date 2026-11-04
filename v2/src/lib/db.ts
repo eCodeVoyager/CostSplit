@@ -1,5 +1,5 @@
 import { Dexie, type EntityTable, type Table } from "dexie"
-import type { AnyRow, Bill, Expense, Meal, Member, Payment, ShopItem, TableName, Trip } from "./types"
+import type { AnyRow, Bill, Expense, Meal, Member, Payment, PersonalExpense, ShopItem, TableName, Trip } from "./types"
 
 export interface KV {
   key: string
@@ -24,6 +24,7 @@ export const db = new Dexie("costsplit-v2") as Dexie & {
   bills: EntityTable<Bill, "id">
   meals: EntityTable<Meal, "id">
   items: EntityTable<ShopItem, "id">
+  personal: EntityTable<PersonalExpense, "id">
   files: EntityTable<FileRow, "id">
   kv: EntityTable<KV, "key">
 }
@@ -46,7 +47,11 @@ db.version(3).stores({
   files: "id, tripId, [tripId+uploaded]",
 })
 
-export const CHILD_TABLES = ["members", "expenses", "payments", "bills", "meals", "items"] as const
+db.version(4).stores({
+  personal: "id, tripId, [tripId+dirty]",
+})
+
+export const CHILD_TABLES = ["members", "expenses", "payments", "bills", "meals", "items", "personal"] as const
 export const SYNC_TABLES: TableName[] = ["trips", ...CHILD_TABLES]
 /** Every Dexie table holding synced rows, for transactions */
 export const allRowTables = () => SYNC_TABLES.map((name) => db.table(name))

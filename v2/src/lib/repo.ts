@@ -1,6 +1,6 @@
 import { allRowTables, CHILD_TABLES, cursorKey, db, meKey, setKV, table } from "./db"
 import { requestSync } from "./sync"
-import type { AnyRow, Bill, Expense, GroupKind, Meal, Member, Payment, Row, ShopItem, TableName, Trip } from "./types"
+import type { AnyRow, Bill, Expense, GroupKind, Meal, Member, Payment, PersonalExpense, Row, ShopItem, TableName, Trip } from "./types"
 
 export function newId(): string {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
@@ -105,24 +105,38 @@ export const setMemberArchived = (id: string, archived: boolean) =>
 
 export const setMe = (tripId: string, memberId: string) => setKV(meKey(tripId), memberId)
 
-export type ExpenseInput = Omit<Expense, keyof Row>
+export type ExpenseInput = Omit<Expense, keyof Row | "createdBy" | "updatedBy">
 
-export async function saveExpense(tripId: string, input: ExpenseInput, id?: string) {
+/** `by` is the member making the change, kept as the expense's history */
+export async function saveExpense(tripId: string, input: ExpenseInput, id?: string, by?: string | null) {
   if (id) {
-    await patchRow("expenses", id, input)
+    await patchRow("expenses", id, { ...input, ...(by ? { updatedBy: by } : {}) })
     return id
   }
-  const expense: Expense = { ...baseRow(tripId), ...input }
+  const expense: Expense = { ...baseRow(tripId), ...input, ...(by ? { createdBy: by } : {}) }
   await db.expenses.add(expense)
   requestSync()
   return expense.id
 }
 
-export async function addPayment(tripId: string, input: Omit<Payment, keyof Row>) {
-  const payment: Payment = { ...baseRow(tripId), ...input }
+export async function addPayment(tripId: string, input: Omit<Payment, keyof Row | "createdBy" | "updatedBy">, by?: string | null) {
+  const payment: Payment = { ...baseRow(tripId), ...input, ...(by ? { createdBy: by } : {}) }
   await db.payments.add(payment)
   requestSync()
   return payment.id
+}
+
+export type PersonalInput = Omit<PersonalExpense, keyof Row | "owner">
+
+export async function savePersonal(tripId: string, input: PersonalInput, id?: string) {
+  if (id) {
+    await patchRow("personal", id, input)
+    return id
+  }
+  const row: PersonalExpense = { ...baseRow(tripId), ...input }
+  await db.personal.add(row)
+  requestSync()
+  return row.id
 }
 
 export async function saveBill(tripId: string, input: BillInput, id?: string) {
@@ -150,20 +164,62 @@ export async function setMeals(tripId: string, date: string, memberId: string, c
   requestSync()
 }
 
-export async function addItem(tripId: string, name: string) {
-  const item: ShopItem = { ...baseRow(tripId), name, done: 0 }
+export const normalizeItem = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ")
+
+/** Adds an item unless it's already on the list (not bought yet). Returns the existing one if so. */
+export async function addItem(
+  tripId: string,
+  name: string,
+  by?: string | null,
+  plan: { urgent?: boolean; needBy?: string } = {}
+): Promise<ShopItem | null> {
+  const key = normalizeItem(name)
+  const existing = (await db.items.where("tripId").equals(tripId).toArray()).find(
+    (i) => !i.deleted && !i.done && normalizeItem(i.name) === key
+  )
+  if (existing) return existing
+  const item: ShopItem = {
+    ...baseRow(tripId),
+    name,
+    done: 0,
+    ...(by ? { createdBy: by } : {}),
+    ...(plan.urgent ? { urgent: 1 as const } : {}),
+    ...(plan.needBy ? { needBy: plan.needBy } : {}),
+  }
   await db.items.add(item)
   requestSync()
+  return null
 }
 
-export const setItemDone = (id: string, done: boolean) => patchRow("items", id, { done: done ? 1 : 0 })
+export const setItemDone = (id: string, done: boolean, by?: string | null) =>
+  patchRow("items", id, { done: done ? 1 : 0, boughtBy: done && by ? by : undefined })
+
+/** Mark urgent, or set/clear the day it's needed by */
+export const planItem = (id: string, plan: { urgent?: boolean; needBy?: string | null }, by?: string | null) =>
+  patchRow("items", id, {
+    ...(by ? { updatedBy: by } : {}),
+    ...(plan.urgent !== undefined ? { urgent: plan.urgent ? (1 as const) : (0 as const) } : {}),
+    ...(plan.needBy !== undefined ? { needBy: plan.needBy ?? undefined } : {}),
+  })
+
+/** To-buy order: urgent first, then by the day it's needed, then oldest first */
+export function byNeed(a: ShopItem, b: ShopItem) {
+  return (b.urgent ?? 0) - (a.urgent ?? 0) || (a.needBy ?? "9999").localeCompare(b.needBy ?? "9999") || a.createdAt - b.createdAt
+}
+
+/** "I'll buy it" (assignee = me), assign someone else, or nobody (null) */
+export const assignItem = (id: string, assignee: string | null, by?: string | null) =>
+  patchRow("items", id, { assignee: assignee ?? undefined, assignedBy: assignee && by ? by : undefined })
 
 export async function removeItems(ids: string[]) {
   for (const id of ids) await patchRow("items", id, { deleted: 1 })
 }
 
-export const softDelete = (name: TableName, id: string) => patchRow(name, id, { deleted: 1 })
-export const restore = (name: TableName, id: string) => patchRow(name, id, { deleted: 0 })
+/** `by` (the member deleting or restoring) shows up in the item's history */
+export const softDelete = (name: TableName, id: string, by?: string | null) =>
+  patchRow(name, id, { deleted: 1, ...(by ? { updatedBy: by } : {}) })
+export const restore = (name: TableName, id: string, by?: string | null) =>
+  patchRow(name, id, { deleted: 0, ...(by ? { updatedBy: by } : {}) })
 
 /** Forget a trip on this device only. Others keep it; it can be re-joined with the link. */
 export async function removeTripLocally(tripId: string) {

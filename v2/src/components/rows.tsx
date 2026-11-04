@@ -27,7 +27,7 @@ export function ExpenseRow({
   const sharers = Object.keys(owed)
   const subtitle = loan
     ? `${payers.length === 1 ? who(payers[0]) : `${payers.length} people`} lent ${sharers.map(who).join(", ")}`
-    : `${payers.length === 1 ? who(payers[0]) : `${payers.length} people`} ${income ? "received" : "paid"}`
+    : `${payers.length === 1 ? who(payers[0]) : `${payers.length} people`} ${income ? "received" : "paid"}${sharers.length > 1 ? ` · ${sharers.length} share` : sharers.length === 1 ? ` · for ${who(sharers[0])}` : ""}`
   const mine = meId ? (paid[meId] ?? 0) - (owed[meId] ?? 0) : 0
   const involved = meId ? paid[meId] !== undefined || owed[meId] !== undefined : false
 
@@ -71,13 +71,21 @@ export function ExpenseRow({
   )
 }
 
-export function PaymentRow({ payment: p }: { payment: Payment }) {
+export function PaymentRow({ payment: p, onClick }: { payment: Payment; onClick?: () => void }) {
   const { trip, meId, names } = useTrip()
   const [viewing, setViewing] = useState(false)
   const who = (id: string) => (id === meId ? "You" : (names.get(id) ?? "?"))
   return (
-    <div className="flex items-center gap-3 px-3 py-3">
-      <PhotoViewer tripId={trip.id} fileId={viewing ? p.proof : undefined} onClose={() => setViewing(false)} label="Proof of payment" />
+    <>
+    {/* Outside the clickable row: clicks inside the viewer would bubble up through the portal */}
+    <PhotoViewer tripId={trip.id} fileId={viewing ? p.proof : undefined} onClose={() => setViewing(false)} label="Proof of payment" />
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => onClick && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onClick())}
+      className={cn("flex items-center gap-3 px-3 py-3", onClick && "cursor-pointer transition-colors hover:bg-accent/50 active:bg-accent")}
+    >
       <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-positive-soft text-positive">
         <HandCoins className="size-5" aria-hidden />
       </span>
@@ -90,7 +98,10 @@ export function PaymentRow({ payment: p }: { payment: Payment }) {
       {p.proof && (
         <button
           type="button"
-          onClick={() => setViewing(true)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setViewing(true)
+          }}
           className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
           aria-label="View proof of payment"
         >
@@ -99,6 +110,7 @@ export function PaymentRow({ payment: p }: { payment: Payment }) {
       )}
       <span className="text-sm font-semibold tabular">{formatMoney(p.amount, trip.currency)}</span>
     </div>
+    </>
   )
 }
 

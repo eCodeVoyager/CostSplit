@@ -15,7 +15,11 @@ import { renderSVG } from "uqr"
 import { loadEnv } from "vite"
 
 const root = path.join(import.meta.dirname, "..")
-const { version } = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))
+const { version, minAppVersion } = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))
+// What's new (shown in the app's update sheet); same file as the in-app "What's new"
+const changelog = JSON.parse(readFileSync(path.join(root, "src", "lib", "changelog.json"), "utf8"))
+if (!changelog[version]) console.warn(`
+No notes for ${version} in src/lib/changelog.json: the update sheet will show none.`)
 
 function run(cmd, args) {
   console.log(`\n> ${cmd} ${args.join(" ")}`)
@@ -68,6 +72,9 @@ const info = {
   sha256: createHash("sha256").update(bytes).digest("hex"),
   date: new Date().toISOString(),
   signed,
+  notes: changelog[version]?.notes ?? [],
+  // Apps older than this are asked to update before carrying on (package.json "minAppVersion")
+  ...(minAppVersion ? { minVersion: minAppVersion } : {}),
 }
 writeFileSync(path.join(out, "version.json"), JSON.stringify(info, null, 2))
 writeFileSync(path.join(out, "qr.svg"), renderSVG(`${publicUrl}/download/`, { border: 1, pixelSize: 8 }))

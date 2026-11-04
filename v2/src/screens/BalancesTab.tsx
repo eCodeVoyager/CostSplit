@@ -1,21 +1,26 @@
-import { ArrowRight, CircleCheck, HandCoins, ImageIcon, Plus, Share2, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { ArrowRight, BellRing, ChevronRight, CircleCheck, HandCoins, ImageIcon, Plus, Share2, Trash2 } from "lucide-react"
+import { useMemo, useState } from "react"
 import { PhotoViewer } from "@/components/PhotoField"
 import { toast } from "sonner"
 import { cn, UNDO_MS } from "@/lib/utils"
-import { BalanceText, EmptyState, MemberAvatar, SectionTitle } from "@/components/common"
+import { BalanceText, EmptyState, MemberAvatar, SectionTitle, Segmented } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { useTrip } from "@/hooks/useTripData"
 import { shortDate } from "@/lib/dates"
+import { directDebts, type Transfer } from "@/lib/balance"
 import { formatMoney } from "@/lib/money"
 import { restore, softDelete } from "@/lib/repo"
-import { settleUpText, shareOrCopy } from "@/lib/share"
+import { settleUpText, shareOrCopy, tripLink } from "@/lib/share"
 import { useTripActions } from "@/hooks/useTripActions"
 
 export function BalancesTab() {
-  const { trip, balances, transfers, payments, meId, names, expenses } = useTrip()
-  const { recordPayment, openAdd } = useTripActions()
+  const { trip, balances, transfers: simplified, payments, meId, names, expenses, mealWeights } = useTrip()
+  const { recordPayment, openAdd, viewMember, viewPayment } = useTripActions()
   const [proof, setProof] = useState<string | undefined>()
+  const [mode, setMode] = useState<"simple" | "direct">("simple")
+  const direct = useMemo(() => directDebts(trip, expenses, payments, mealWeights), [trip, expenses, payments, mealWeights])
+  // Settled overall means settled: direct debts that only go round in a circle cancel out
+  const transfers = mode === "simple" || simplified.length === 0 ? simplified : direct
   const label = (id: string) => (id === meId ? "You" : (names.get(id) ?? "?"))
   const me = balances.find((b) => b.memberId === meId)
   const maxAbs = Math.max(1, ...balances.map((b) => Math.abs(b.net)))
@@ -44,28 +49,40 @@ export function BalancesTab() {
   }
 
   const removePayment = async (id: string) => {
-    await softDelete("payments", id)
-    toast("Payment removed", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("payments", id) } })
+    await softDelete("payments", id, meId)
+    toast("Payment removed", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("payments", id, meId) } })
+  }
+
+  /** A friendly nudge for one payment, ready for WhatsApp */
+  const remind = async (t: Transfer) => {
+    const text = `Hi ${names.get(t.from) ?? ""}, in ${trip.emoji} ${trip.name} you owe ${t.to === meId ? "me" : names.get(t.to)} ${formatMoney(t.amount, trip.currency)}. Details: ${tripLink(trip.id)}`
+    const result = await shareOrCopy({ title: trip.name, text })
+    if (result === "copied") toast.success("Reminder copied — paste it in a chat")
   }
 
   return (
     <div className="pt-4">
       <PhotoViewer tripId={trip.id} fileId={proof} onClose={() => setProof(undefined)} label="Proof of payment" />
       {me && (
-        <div
+        <button
+          type="button"
+          onClick={() => viewMember(me.memberId)}
           className={cn(
-            "rounded-2xl p-4",
+            "flex w-full items-center gap-2 rounded-2xl p-4 text-left transition-transform active:scale-[0.99]",
             me.net > 0 ? "bg-positive-soft" : me.net < 0 ? "bg-negative-soft" : "bg-secondary"
           )}
         >
-          <p className="text-sm text-muted-foreground">Your balance</p>
-          <p className="mt-0.5 text-2xl font-bold">
-            <BalanceText net={me.net} currency={trip.currency} you />
-          </p>
-          <p className="mt-1 text-xs tabular text-muted-foreground">
-            You paid {formatMoney(me.paid, trip.currency)} · your share {formatMoney(me.share, trip.currency)}
-          </p>
-        </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted-foreground">Your balance</p>
+            <p className="mt-0.5 text-2xl font-bold">
+              <BalanceText net={me.net} currency={trip.currency} you />
+            </p>
+            <p className="mt-1 text-xs tabular text-muted-foreground">
+              You paid {formatMoney(me.paid, trip.currency)} · your share {formatMoney(me.share, trip.currency)} · tap to see why
+            </p>
+          </div>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
       )}
 
       <SectionTitle
@@ -79,6 +96,24 @@ export function BalancesTab() {
       >
         Settle up
       </SectionTitle>
+      {simplified.length > 0 && (
+        <div className="mb-2 space-y-1.5">
+          <Segmented
+            label="How to settle"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "simple", label: `Fewest payments (${simplified.length})` },
+              { value: "direct", label: `Who owes whom (${direct.length})` },
+            ]}
+          />
+          <p className="px-1 text-xs text-muted-foreground">
+            {mode === "simple"
+              ? "Debts are combined so everyone is settled with as few payments as possible. You may pay someone you didn't share with; the totals are the same."
+              : "Each debt to the person you actually shared with. More payments, same end result."}
+          </p>
+        </div>
+      )}
       {transfers.length === 0 ? (
         <div className="flex items-center gap-3 rounded-2xl border bg-card p-4">
           <CircleCheck className="size-6 text-positive" aria-hidden />
@@ -99,6 +134,11 @@ export function BalancesTab() {
                   </p>
                   <p className="text-base font-semibold tabular">{formatMoney(t.amount, trip.currency)}</p>
                 </div>
+                {t.to === meId && (
+                  <Button variant="ghost" size="icon" className="size-10 text-muted-foreground" onClick={() => remind(t)} aria-label={`Remind ${names.get(t.from)}`}>
+                    <BellRing className="size-4" />
+                  </Button>
+                )}
                 <Button variant={mine ? "default" : "outline"} className="h-10" onClick={() => recordPayment(t)}>
                   Mark paid
                 </Button>
@@ -108,10 +148,11 @@ export function BalancesTab() {
         </ul>
       )}
 
-      <SectionTitle>Everyone</SectionTitle>
+      <SectionTitle>Everyone · tap for their statement</SectionTitle>
       <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
         {sorted.map((b) => (
-          <li key={b.memberId} className="px-3 py-3">
+          <li key={b.memberId}>
+            <button type="button" onClick={() => viewMember(b.memberId)} className="block w-full px-3 py-3 text-left active:bg-accent">
             <div className="flex items-center gap-3">
               <MemberAvatar id={b.memberId} name={b.name} className="size-8" />
               <div className="min-w-0 flex-1">
@@ -123,6 +164,7 @@ export function BalancesTab() {
                 </p>
               </div>
               <BalanceText net={b.net} currency={trip.currency} className="text-right text-sm" />
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             </div>
             {/* Diverging bar: left of center owes, right of center gets back */}
             <div className="mt-2 grid grid-cols-2 gap-px" aria-hidden>
@@ -133,6 +175,7 @@ export function BalancesTab() {
                 {b.net > 0 && <div className="h-full rounded-r-full bg-positive" style={{ width: `${(b.net / maxAbs) * 100}%` }} />}
               </div>
             </div>
+            </button>
           </li>
         ))}
       </ul>
@@ -155,7 +198,7 @@ export function BalancesTab() {
           {payments.map((p) => (
             <li key={p.id} className="flex items-center gap-3 py-2 pr-1 pl-3">
               <HandCoins className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-              <div className="min-w-0 flex-1">
+              <button type="button" onClick={() => viewPayment(p)} className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm">
                   <strong className="font-medium">{label(p.from)}</strong> paid <strong className="font-medium">{label(p.to)}</strong>
                 </p>
@@ -163,7 +206,7 @@ export function BalancesTab() {
                   {shortDate(p.date)}
                   {p.note ? ` · ${p.note}` : ""}
                 </p>
-              </div>
+              </button>
               {p.proof && (
                 <Button variant="ghost" size="icon" className="size-11 text-muted-foreground" onClick={() => setProof(p.proof)} aria-label="View proof of payment">
                   <ImageIcon className="size-4" />

@@ -16,7 +16,9 @@ import { fileURLToPath } from "node:url"
 import { consoleMailer, createAuth, resendMailer } from "./auth.mjs"
 import { HttpError } from "./http-error.mjs"
 
-const TABLES = new Set(["trips", "members", "expenses", "payments", "bills", "meals", "items"])
+const TABLES = new Set(["trips", "members", "expenses", "payments", "bills", "meals", "items", "personal"])
+/** Rows only their owner may read or change (personal expenses): never sent to the rest of the group */
+const PRIVATE_TABLES = new Set(["personal"])
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
 const MAX_BODY = 1024 * 1024
 // Photos are resized to ~1600px JPEG on the phone, so this is generous
@@ -96,11 +98,15 @@ function createStore(dataDir) {
       let changed = false
       for (const [key, { table, record }] of latest) {
         const current = trip.records[key]
+        // Someone else's private row: never overwrite it, even with a newer timestamp
+        if (PRIVATE_TABLES.has(table) && current && current.data.owner !== userId) continue
         if (current && current.updatedAt >= record.updatedAt) continue
         if (!current && Object.keys(trip.records).length >= MAX_RECORDS_PER_TRIP) {
           throw new HttpError(413, "Trip is full")
         }
         const { dirty: _dirty, ...data } = record
+        // The server decides who owns a private row, not the client
+        if (PRIVATE_TABLES.has(table)) data.owner = userId
         trip.seq += 1
         trip.records[key] = { table, seq: trip.seq, updatedAt: record.updatedAt, data }
         changed = true
@@ -116,11 +122,14 @@ function createStore(dataDir) {
       const newer = Object.values(trip.records)
         .filter((r) => r.seq > cursor)
         .sort((a, b) => a.seq - b.seq)
-      const page = newer.slice(0, PAGE_SIZE)
+      const visible = newer.filter((r) => !PRIVATE_TABLES.has(r.table) || r.data.owner === userId)
+      const page = visible.slice(0, PAGE_SIZE)
+      const hasMore = visible.length > PAGE_SIZE
       return {
         joined,
-        cursor: page.length ? page[page.length - 1].seq : cursor,
-        hasMore: newer.length > PAGE_SIZE,
+        // Skip past other people's private rows too, so they aren't scanned again next time
+        cursor: hasMore ? page[page.length - 1].seq : newer.length ? newer[newer.length - 1].seq : cursor,
+        hasMore,
         changes: page.map((r) => ({ table: r.table, record: r.data })),
       }
     })

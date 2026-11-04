@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react"
 import { Redirect, Route, Switch } from "wouter"
 import { Splash } from "@/components/common"
+import { NotificationsHost } from "@/components/NotificationsHost"
+import { UpdateSheet, WhatsNewSheet } from "@/components/UpdateSheets"
 import { SignInHost } from "@/components/SignInSheet"
 import { Toaster } from "@/components/ui/sonner"
 import { HomeScreen } from "@/screens/HomeScreen"
@@ -26,6 +28,9 @@ export default function App() {
         </Switch>
       </Suspense>
       <SignInHost />
+      <NotificationsHost />
+      <UpdateSheet />
+      <WhatsNewSheet />
       {/* Edge-to-edge Android: scrolled content never runs under the clock and battery icons */}
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-40 h-(--sat) bg-background/90 backdrop-blur-md" />
       {/* Snackbar-style: above the tab bar and + button, so toasts never cover the header's back/sync/invite buttons */}

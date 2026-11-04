@@ -12,9 +12,18 @@ export interface SyncState {
   error?: string
 }
 
-interface Change {
+export interface Change {
   table: TableName
   record: Omit<AnyRow, "dirty">
+}
+
+type RemoteListener = (tripId: string, changes: Change[]) => void
+const remoteListeners = new Set<RemoteListener>()
+
+/** Rows other devices changed, as they arrive (not on a group's first download) */
+export function onRemoteChanges(listener: RemoteListener) {
+  remoteListeners.add(listener)
+  return () => remoteListeners.delete(listener)
 }
 
 interface SyncResponse {
@@ -124,6 +133,8 @@ async function uploadFiles(tripId: string) {
 
 /** Push this trip's local changes, then pull everything newer than our cursor */
 export async function syncTrip(tripId: string) {
+  const firstDownload = (await getKV(cursorKey(tripId), 0)) === 0
+  const arrived: Change[] = []
   for (let round = 0; round < 100; round++) {
     const cursor = await getKV(cursorKey(tripId), 0)
     const dirty = await collectDirty(tripId)
@@ -144,12 +155,14 @@ export async function syncTrip(tripId: string) {
         const newer = !current || record.updatedAt > current.updatedAt
         const same = current && record.updatedAt === current.updatedAt && !current.dirty
         if (newer || same) await table(name).put({ ...record, dirty: 0 } as AnyRow)
+        if (newer) arrived.push({ table: name, record })
       }
       await db.kv.put({ key: cursorKey(tripId), value: res.cursor })
     })
 
     if (!res.hasMore && dirty.length <= BATCH) break
   }
+  if (!firstDownload && arrived.length) remoteListeners.forEach((l) => l(tripId, arrived))
   await uploadFiles(tripId)
 }
 

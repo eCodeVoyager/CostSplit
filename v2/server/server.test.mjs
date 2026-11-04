@@ -112,6 +112,30 @@ describe("sync server", () => {
     assert.equal((await res.json()).changes.length, 2)
   })
 
+  it("keeps personal expenses private to their owner", async () => {
+    const personal = (id, over = {}) => ({ id, tripId: TRIP, title: "Lunch", amount: 500, updatedAt: 5000, deleted: 0, ...over })
+    const bob = await signIn("erin@example.com")
+    const mine = await sync({ tripId: TRIP, changes: [{ table: "personal", record: personal("personal-aaa", { owner: "someone-else" }) }] })
+    assert.equal(mine.status, 200)
+    const own = mine.body.changes.find((c) => c.table === "personal")
+    assert.equal(own.record.title, "Lunch")
+    assert.notEqual(own.record.owner, "someone-else", "the server sets the owner, not the client")
+
+    // Bob is in the same group but never receives Alice's row
+    const theirs = await sync({ tripId: TRIP, cursor: 0 }, bob)
+    assert.equal(theirs.status, 200)
+    assert.equal(theirs.body.changes.some((c) => c.table === "personal"), false)
+    assert.ok(theirs.body.changes.some((c) => c.table === "trips"))
+    assert.equal(theirs.body.cursor, mine.body.cursor, "the cursor still moves past hidden rows")
+
+    // ...and can't overwrite it by reusing the id
+    await sync({ tripId: TRIP, changes: [{ table: "personal", record: personal("personal-aaa", { title: "Hacked", updatedAt: 9000 }) }] }, bob)
+    const check = await sync({ tripId: TRIP, cursor: 0 })
+    assert.equal(check.body.changes.find((c) => c.table === "personal").record.title, "Lunch")
+    assert.equal((await sync({ tripId: TRIP, cursor: 0 }, bob)).body.changes.some((c) => c.table === "personal"), false)
+    await call("/api/groups/leave", { body: { tripId: TRIP }, token: bob })
+  })
+
   it("rejects bad input", async () => {
     assert.equal((await sync({ tripId: "bad id!" })).status, 400)
     assert.equal((await sync({ tripId: TRIP, cursor: -1 })).status, 400)

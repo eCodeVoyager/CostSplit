@@ -8,9 +8,9 @@ import {
   type MemberBalance,
   type Transfer,
 } from "@/lib/balance"
-import { toISODate } from "@/lib/dates"
+import { shiftMonth, toISODate } from "@/lib/dates"
 import { db, getKV, meKey } from "@/lib/db"
-import type { Bill, Expense, GroupKind, Meal, Member, Payment, ShopItem, Trip } from "@/lib/types"
+import type { Bill, Expense, GroupKind, Meal, Member, Payment, PersonalExpense, ShopItem, Trip } from "@/lib/types"
 
 export interface BillStatus {
   bill: Bill
@@ -43,6 +43,11 @@ export interface TripData {
   mealsByDay: Map<string, Record<string, number>>
   mealWeights: MealWeights
   items: ShopItem[]
+  /** My private expenses in this group, newest first (never in balances) */
+  personal: PersonalExpense[]
+  /** Recently deleted, newest change first, so they can be checked and restored */
+  deletedExpenses: Expense[]
+  deletedPayments: Payment[]
   meId: string | null
   balances: MemberBalance[]
   transfers: Transfer[]
@@ -54,13 +59,9 @@ const byCreated = (a: { createdAt: number }, b: { createdAt: number }) => a.crea
 const newestFirst = (a: { date: string; createdAt: number }, b: { date: string; createdAt: number }) =>
   b.date.localeCompare(a.date) || b.createdAt - a.createdAt
 
-export function shiftMonth(period: string, delta: number) {
-  const [y, m] = period.split("-").map(Number)
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-}
+export { shiftMonth }
 
-function billStatuses(bills: Bill[], expenses: Expense[]): BillStatus[] {
+export function billStatuses(bills: Bill[], expenses: Expense[]): BillStatus[] {
   const today = toISODate()
   const current = today.slice(0, 7)
   const previous = shiftMonth(current, -1)
@@ -86,21 +87,22 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
   const raw = useLiveQuery(async () => {
     const trip = await db.trips.get(tripId)
     if (!trip) return null
-    const [members, expenses, payments, bills, meals, items, meId] = await Promise.all([
+    const [members, expenses, payments, bills, meals, items, personal, meId] = await Promise.all([
       db.members.where("tripId").equals(tripId).toArray(),
       db.expenses.where("tripId").equals(tripId).toArray(),
       db.payments.where("tripId").equals(tripId).toArray(),
       db.bills.where("tripId").equals(tripId).toArray(),
       db.meals.where("tripId").equals(tripId).toArray(),
       db.items.where("tripId").equals(tripId).toArray(),
+      db.personal.where("tripId").equals(tripId).toArray(),
       getKV<string | null>(meKey(tripId), null),
     ])
-    return { trip, members, expenses, payments, bills, meals, items, meId }
+    return { trip, members, expenses, payments, bills, meals, items, personal, meId }
   }, [tripId])
 
   return useMemo(() => {
     if (raw === undefined || raw === null) return raw
-    const { trip, members, expenses, payments, bills, meals, items, meId } = raw
+    const { trip, members, expenses, payments, bills, meals, items, personal, meId } = raw
     const everyone = members.filter((m) => !m.deleted).sort(byCreated)
     const active = everyone.filter((m) => !m.archived)
     const liveExpenses = expenses.filter((e) => !e.deleted).sort(newestFirst)
@@ -111,7 +113,10 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
     const mealsByDay = new Map<string, Record<string, number>>()
     for (const m of liveMeals) mealsByDay.set(m.date, { ...mealsByDay.get(m.date), [m.memberId]: m.count })
     const liveBills = bills.filter((b) => !b.deleted).sort((a, b) => a.dueDay - b.dueDay || byCreated(a, b))
-    const pending = [trip, ...members, ...expenses, ...payments, ...bills, ...meals, ...items].filter((r) => r.dirty).length
+    const pending = [trip, ...members, ...expenses, ...payments, ...bills, ...meals, ...items, ...personal].filter(
+      (r) => r.dirty
+    ).length
+    const recentlyChanged = (a: { updatedAt: number }, b: { updatedAt: number }) => b.updatedAt - a.updatedAt
 
     return {
       trip,
@@ -129,6 +134,9 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
       mealsByDay,
       mealWeights: weights,
       items: items.filter((i) => !i.deleted).sort((a, b) => a.done - b.done || byCreated(a, b)),
+      personal: personal.filter((p) => !p.deleted).sort(newestFirst),
+      deletedExpenses: expenses.filter((e) => e.deleted).sort(recentlyChanged),
+      deletedPayments: payments.filter((p) => p.deleted).sort(recentlyChanged),
       meId: meId && active.some((m) => m.id === meId) ? meId : null,
       balances,
       transfers: suggestTransfers(balances),

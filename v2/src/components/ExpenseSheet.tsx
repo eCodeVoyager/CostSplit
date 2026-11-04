@@ -1,4 +1,4 @@
-import { CalendarDays, Check, Minus, Plus, StickyNote, Trash2 } from "lucide-react"
+import { CalendarDays, Check, History, Minus, Plus, StickyNote, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { cn, UNDO_MS } from "@/lib/utils"
@@ -9,14 +9,18 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useBackClose } from "@/hooks/useBackClose"
 import { useTrip } from "@/hooks/useTripData"
-import { monthOf } from "@/lib/balance"
+import { expenseImpact, expenseTransfers, monthOf } from "@/lib/balance"
 import { categoriesFor, getCategory, guessCategory, quickPicksFor, type QuickPick } from "@/lib/categories"
-import { addDays, toISODate } from "@/lib/dates"
+import { addDays, dayLabel, toISODate } from "@/lib/dates"
 import { allocate, convertToBase, currencySymbol, formatMoney, minorToInput, parseAmount } from "@/lib/money"
-import { restore, saveExpense, softDelete } from "@/lib/repo"
+import { autoFill, parseTyped, typedFromSaved } from "@/lib/autofill"
+import { removeItems, restore, saveExpense, savePersonal, softDelete } from "@/lib/repo"
+import { expenseWarnings, usePrefs } from "@/lib/review"
 import type { Expense, SplitMode } from "@/lib/types"
+import { BreakdownSection, ExpenseBreakdown, WarningList, WhoOwesWhom } from "./breakdown"
 import { Chip, MemberAvatar, Segmented } from "./common"
 import { PhotoField } from "./PhotoField"
+import { ChangeList, ReviewDialog } from "./ReviewDialog"
 
 /** Starting values for a new expense (bill payment, bazar, loan, shopping list...) */
 export interface ExpensePreset {
@@ -35,6 +39,10 @@ export interface ExpensePreset {
   period?: string
   /** Shown under the title, e.g. "Rent · October bill" */
   context?: string
+  /** Start from an existing expense ("Add again"): same everything, dated today */
+  copyOf?: Expense
+  /** What was bought (from the to-buy list) */
+  items?: string[]
   onSaved?: (id: string) => void
 }
 
@@ -51,11 +59,18 @@ interface FormState {
   categoryTouched: boolean
   multiPay: boolean
   payer: string
+  /** Several payers: who paid */
+  payers: Record<string, boolean>
+  /** Only what was typed; blank boxes are filled in by the app */
   payerAmounts: Record<string, string>
   splitMode: SplitMode
   included: Record<string, boolean>
   shares: Record<string, number>
+  /** Only what was typed; blank boxes are filled in by the app */
   exact: Record<string, string>
+  /** To-buy list items bought with this */
+  fromList: string[]
+  itemsText: string
   date: string
   note: string
   showNote: boolean
@@ -74,7 +89,9 @@ export function ExpenseSheet({
   expense?: Expense | null
   preset?: ExpensePreset | null
 }) {
-  const { trip, kind, members, everyone, meId, expenses, mealWeights } = useTrip()
+  const { trip, kind, members, everyone, meId, expenses, mealWeights, names, items: shopItems } = useTrip()
+  const prefs = usePrefs()
+  const [reviewing, setReviewing] = useState(false)
   // Editing an old expense still shows people who have since moved out
   const people = useMemo(
     () => (expense ? everyone.filter((m) => !m.archived || m.id in expense.paidBy || m.id in expense.split) : members),
@@ -95,7 +112,8 @@ export function ExpenseSheet({
     if (key === "new" && draftFor.current === key && form) return
     draftFor.current = key
     setSubmitted(false)
-    setForm(expense ? fromExpense(expense) : blank())
+    setReviewing(false)
+    setForm(expense ? fromExpense(expense) : preset?.copyOf ? copied(preset.copyOf) : blank())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, expense?.id, preset])
 
@@ -115,6 +133,7 @@ export function ExpenseSheet({
       categoryTouched: !!p.category,
       multiPay: false,
       payer: p.payer ?? meId ?? members[0]?.id ?? "",
+      payers: {},
       payerAmounts: {},
       splitMode: p.splitMode ?? "equal",
       included: Object.fromEntries(members.map((m) => [m.id, sharing.has(m.id)])),
@@ -122,20 +141,25 @@ export function ExpenseSheet({
         p.splitMode === "shares" && p.weights
           ? { ...p.weights }
           : Object.fromEntries(members.map((m) => [m.id, sharing.has(m.id) ? 1 : 0])),
-      exact:
-        p.splitMode === "exact" && p.weights
-          ? Object.fromEntries(Object.entries(p.weights).map(([id, v]) => [id, minorToInput(v, base)]))
-          : {},
+      exact: p.splitMode === "exact" && p.weights ? typedFromSaved(p.amount ?? 0, p.weights, base) : {},
+      fromList: [],
+      itemsText: (p.items ?? []).join(", "),
       date: toISODate(),
       note: "",
       showNote: false,
     }
   }
 
+  /** Same people and split as an earlier expense, as a new one dated today */
+  function copied(e: Expense): FormState {
+    const active = new Set(members.map((m) => m.id))
+    const keep = (rec: Record<string, number>) => Object.fromEntries(Object.entries(rec).filter(([id]) => active.has(id)))
+    const f = fromExpense({ ...e, paidBy: keep(e.paidBy), split: keep(e.split) })
+    return { ...f, date: toISODate(), receipt: undefined, note: "", showNote: false }
+  }
+
   function fromExpense(e: Expense): FormState {
     const payers = Object.keys(e.paidBy)
-    const toText = (rec: Record<string, number>) =>
-      Object.fromEntries(Object.entries(rec).map(([id, v]) => [id, minorToInput(v, e.currency)]))
     return {
       kind: e.kind ?? "expense",
       splitTouched: true,
@@ -147,12 +171,15 @@ export function ExpenseSheet({
       categoryTouched: true,
       multiPay: payers.length > 1,
       payer: payers[0] ?? meId ?? "",
-      payerAmounts: toText(e.paidBy),
+      payers: Object.fromEntries(payers.map((id) => [id, true])),
+      payerAmounts: payers.length > 1 ? typedFromSaved(e.amount, e.paidBy, e.currency) : {},
       splitMode: e.splitMode,
       included: Object.fromEntries(Object.keys(e.split).map((id) => [id, true])),
       shares:
         e.splitMode === "shares" ? { ...e.split } : Object.fromEntries(people.map((m) => [m.id, e.split[m.id] ? 1 : 0])),
-      exact: e.splitMode === "exact" ? toText(e.split) : {},
+      exact: e.splitMode === "exact" ? typedFromSaved(e.amount, e.split, e.currency) : {},
+      fromList: [],
+      itemsText: (e.items ?? []).join(", "),
       date: e.date,
       note: e.note ?? "",
       showNote: !!e.note,
@@ -184,32 +211,38 @@ export function ExpenseSheet({
   const amount = parseAmount(form.amountText, cur)
   const currencyOptions = [base, ...Object.keys(trip.rates ?? {}).filter((c) => c !== base)]
 
-  // Who paid
+  // Who paid. Several payers: typed amounts stay, blank ones share what's left
   let paidBy: Record<string, number> = {}
   let payLeft = 0
+  const payerIds = people.filter((m) => form.payers[m.id]).map((m) => m.id)
+  const payFill = autoFill(
+    amount ?? 0,
+    payerIds,
+    Object.fromEntries(payerIds.map((id) => [id, parseTyped(form.payerAmounts[id], cur)]))
+  )
   if (form.multiPay) {
-    for (const [id, text] of Object.entries(form.payerAmounts)) {
-      const v = parseAmount(text, cur)
-      if (v) paidBy[id] = v
-    }
-    payLeft = (amount ?? 0) - Object.values(paidBy).reduce((s, v) => s + v, 0)
+    paidBy = Object.fromEntries(Object.entries(payFill.amounts).filter(([, v]) => v > 0))
+    payLeft = amount ? payFill.left : 0
   } else if (form.payer) {
     paidBy = { [form.payer]: amount ?? 0 }
   }
 
-  // How it's split
+  // How it's split. Amounts: typed amounts stay, blank ones share what's left equally
   let split: Record<string, number> = {}
   let splitLeft = 0
+  const sharerIds = people.filter((m) => form.included[m.id]).map((m) => m.id)
+  const exactFill = autoFill(
+    amount ?? 0,
+    sharerIds,
+    Object.fromEntries(sharerIds.map((id) => [id, parseTyped(form.exact[id], cur)]))
+  )
   if (form.splitMode === "equal" || form.splitMode === "meals") {
-    split = Object.fromEntries(Object.entries(form.included).filter(([, on]) => on).map(([id]) => [id, 1]))
+    split = Object.fromEntries(sharerIds.map((id) => [id, 1]))
   } else if (form.splitMode === "shares") {
     split = Object.fromEntries(Object.entries(form.shares).filter(([, n]) => n > 0))
   } else {
-    for (const [id, text] of Object.entries(form.exact)) {
-      const v = parseAmount(text, cur)
-      if (v) split[id] = v
-    }
-    splitLeft = (amount ?? 0) - Object.values(split).reduce((s, v) => s + v, 0)
+    split = Object.fromEntries(Object.entries(exactFill.amounts).filter(([, v]) => v > 0))
+    splitLeft = amount ? exactFill.left : 0
   }
   // Meals: weight by meals eaten this month (falls back to equal until counted)
   const monthMeals = mealWeights.get(monthOf(form.date)) ?? {}
@@ -221,19 +254,23 @@ export function ExpenseSheet({
   const errors = {
     amount: !amount ? "Enter an amount" : null,
     paid: form.multiPay
-      ? payLeft !== 0 && amount
-        ? payLeft > 0
-          ? `${formatMoney(payLeft, cur)} still unassigned`
-          : `${formatMoney(-payLeft, cur)} too much`
-        : Object.keys(paidBy).length === 0
-          ? "Enter who paid how much"
-          : null
+      ? payerIds.length === 0
+        ? "Tick who paid"
+        : payLeft !== 0 && amount
+          ? payLeft > 0
+            ? `${formatMoney(payLeft, cur)} still unassigned`
+            : `${formatMoney(-payLeft, cur)} more than the total`
+          : Object.keys(paidBy).length === 0 && amount
+            ? "Enter who paid how much"
+            : null
       : !form.payer
         ? "Choose who paid"
         : null,
     split:
       Object.keys(split).length === 0
-        ? "Pick at least one person"
+        ? form.splitMode === "exact" && sharerIds.length > 0 && !amount
+          ? null
+          : "Pick at least one person"
         : form.splitMode === "exact" && splitLeft !== 0 && amount
           ? splitLeft > 0
             ? `${formatMoney(splitLeft, cur)} left to split`
@@ -258,51 +295,106 @@ export function ExpenseSheet({
     set({ currency: next, rate: next === base ? 1 : (trip.rates[next] ?? 1) })
   }
 
-  const setSplitMode = (mode: SplitMode) => {
-    if (mode === "exact" && amount && Object.keys(form.exact).length === 0) {
-      // Start from an even split so people only adjust what differs
-      const even = allocate(amount, split)
-      set({
-        splitMode: mode,
-        splitTouched: true,
-        exact: Object.fromEntries(Object.entries(even).map(([id, v]) => [id, minorToInput(v, cur)])),
-      })
-    } else {
-      set({ splitMode: mode, splitTouched: true })
-    }
-  }
+  // Amounts start as an even split of whoever shares it (all blank = all filled in)
+  const setSplitMode = (mode: SplitMode) => set({ splitMode: mode, splitTouched: true })
 
   const toggleMultiPay = () => {
-    if (!form.multiPay && amount && form.payer) {
-      set({ multiPay: true, payerAmounts: { [form.payer]: minorToInput(amount, cur) } })
+    if (!form.multiPay) {
+      set({ multiPay: true, payers: form.payer ? { [form.payer]: true } : {}, payerAmounts: {} })
     } else {
-      set({ multiPay: !form.multiPay })
+      set({ multiPay: false, payer: payerIds[0] ?? form.payer })
     }
   }
 
-  const save = async () => {
+  const togglePayer = (id: string) => {
+    const on = !form.payers[id]
+    const { [id]: _drop, ...rest } = form.payerAmounts
+    set({ payers: { ...form.payers, [id]: on }, payerAmounts: on ? form.payerAmounts : rest })
+  }
+
+  const toggleSharer = (id: string) => {
+    const on = !form.included[id]
+    const { [id]: _drop, ...rest } = form.exact
+    set({ included: { ...form.included, [id]: on }, exact: on ? form.exact : rest })
+  }
+
+  // Same title as before: offer that expense's split ("Internet" is always the same 3 people)
+  const titleKey = form.title.trim().toLowerCase()
+  const last =
+    !expense && !preset?.copyOf && !form.billId && titleKey
+      ? expenses.find((e) => (e.kind ?? "expense") === form.kind && e.title.trim().toLowerCase() === titleKey)
+      : undefined
+  const lastIds = last ? Object.keys(last.split).filter((id) => members.some((m) => m.id === id)) : []
+  const sameAsLast =
+    !!last &&
+    last.splitMode === form.splitMode &&
+    lastIds.length === Object.keys(split).length &&
+    lastIds.every((id) => id in split) &&
+    (last.splitMode !== "shares" || lastIds.every((id) => last.split[id] === split[id]))
+  const suggestLast = last && lastIds.length > 0 && !sameAsLast ? last : null
+  const applyLast = () => {
+    if (!suggestLast) return
+    const ids = new Set(lastIds)
+    const mode = suggestLast.splitMode === "meals" && !trip.mealMode ? "equal" : suggestLast.splitMode
+    const kept = Object.fromEntries(lastIds.map((id) => [id, suggestLast.split[id]]))
+    set({
+      splitMode: mode,
+      splitTouched: true,
+      included: Object.fromEntries(people.map((m) => [m.id, ids.has(m.id)])),
+      shares: mode === "shares" ? Object.fromEntries(people.map((m) => [m.id, kept[m.id] ?? 0])) : form.shares,
+      exact: mode === "exact" && amount === suggestLast.amount ? typedFromSaved(suggestLast.amount, kept, cur) : {},
+    })
+  }
+
+  // Bazar items: ticked from the to-buy list, plus anything typed
+  const openItems = shopItems.filter((i) => !i.done)
+  const pickedItems = shopItems.filter((i) => form.fromList.includes(i.id))
+  const itemNames = [
+    ...new Set(
+      [...pickedItems.map((i) => i.name), ...form.itemsText.split(/[,\n]/)].map((n) => n.trim().slice(0, 60)).filter(Boolean)
+    ),
+  ].slice(0, 40)
+  const showItems =
+    !income && (["groceries", "household"].includes(form.category) || itemNames.length > 0 || form.fromList.length > 0)
+
+  const input = {
+    ...(income ? { kind: "income" as const } : {}),
+    ...(form.billId ? { billId: form.billId, period: form.period } : {}),
+    title: form.title.trim() || getCategory(form.category).label,
+    category: form.category,
+    amount: amount ?? 0,
+    currency: cur,
+    rate: cur === base ? 1 : form.rate,
+    date: form.date,
+    paidBy,
+    splitMode: form.splitMode,
+    split,
+    // Always written so clearing the note, items or photo while editing removes them
+    note: form.note.trim() ? form.note.trim().slice(0, 500) : undefined,
+    items: itemNames.length ? itemNames : undefined,
+    receipt: form.receipt,
+  }
+  // The expense exactly as it would be saved, for the live "who owes whom" and the confirm step
+  const draft: Expense = {
+    ...(expense ?? { id: "draft", tripId: trip.id, createdAt: 0, updatedAt: 0, deleted: 0, dirty: 0 }),
+    ...input,
+  }
+  if (!income) delete draft.kind
+  const liveTransfers = valid && amount ? expenseTransfers(expenseImpact(draft, trip, mealWeights)) : []
+
+  const save = () => {
     setSubmitted(true)
     if (!valid || !amount) return
-    const id = await saveExpense(
-      trip.id,
-      {
-        ...(income ? { kind: "income" as const } : {}),
-        ...(form.billId ? { billId: form.billId, period: form.period } : {}),
-        title: form.title.trim() || getCategory(form.category).label,
-        category: form.category,
-        amount,
-        currency: cur,
-        rate: cur === base ? 1 : form.rate,
-        date: form.date,
-        paidBy,
-        splitMode: form.splitMode,
-        split,
-        ...(form.note.trim() ? { note: form.note.trim().slice(0, 500) } : {}),
-        // Always written so removing a photo while editing clears it
-        receipt: form.receipt,
-      },
-      expense?.id
-    )
+    if (prefs.review) setReviewing(true)
+    else commit()
+  }
+
+  const commit = async () => {
+    if (!valid || !amount) return
+    setReviewing(false)
+    const id = await saveExpense(trip.id, input, expense?.id, meId)
+    // Bought now, so off the to-buy list
+    if (pickedItems.length) await removeItems(pickedItems.map((i) => i.id))
     navigator.vibrate?.(15)
     draftFor.current = null
     close()
@@ -314,12 +406,43 @@ export function ExpenseSheet({
     }
   }
 
-  const remove = async () => {
-    if (!expense) return
-    await softDelete("expenses", expense.id)
+  /** Only I paid and only I share it: it belongs in Personal, not the group */
+  const saveAsPersonal = async () => {
+    if (!amount) return
+    setReviewing(false)
+    const id = await savePersonal(trip.id, {
+      title: input.title,
+      category: input.category,
+      amount,
+      currency: cur,
+      rate: input.rate,
+      date: form.date,
+      ...(input.note ? { note: input.note } : {}),
+    })
     draftFor.current = null
     close()
-    toast("Expense deleted", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("expenses", expense.id) } })
+    toast.success(`Saved to Personal: ${formatMoney(amount, cur)}`, {
+      description: "Only you can see it. It doesn't change group balances.",
+      duration: UNDO_MS,
+      action: { label: "Undo", onClick: () => softDelete("personal", id) },
+    })
+  }
+
+  const who = (id: string) => (id === meId ? "You" : (names.get(id) ?? "?"))
+  const changes = expense ? describeChanges(expense, draft, who) : []
+  const warnings = reviewing && amount ? expenseWarnings({ ...input, id: expense?.id, kind: form.kind }, expenses, trip, toISODate()) : []
+
+  /** "Rest" button: give the unassigned amount to this person */
+  const addRest = (field: "payerAmounts" | "exact", id: string, left: number, current: number) => {
+    set({ [field]: { ...form[field], [id]: minorToInput(current + left, cur) } } as Partial<FormState>)
+  }
+
+  const remove = async () => {
+    if (!expense) return
+    await softDelete("expenses", expense.id, meId)
+    draftFor.current = null
+    close()
+    toast("Expense deleted", { duration: UNDO_MS, action: { label: "Undo", onClick: () => restore("expenses", expense.id, meId) } })
   }
 
   const showErrors = submitted || form.amountText !== ""
@@ -417,6 +540,44 @@ export function ExpenseSheet({
               </div>
             </div>
 
+            {showItems && (
+              <div className="space-y-2">
+                <Label htmlFor="items">
+                  Items bought <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                {openItems.length > 0 && !expense && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">From the to-buy list: tap what you bought, it comes off the list.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {openItems.map((i) => {
+                        const on = form.fromList.includes(i.id)
+                        return (
+                          <Chip
+                            key={i.id}
+                            selected={on}
+                            onClick={() => set({ fromList: on ? form.fromList.filter((x) => x !== i.id) : [...form.fromList, i.id] })}
+                            className="min-h-9 px-3 text-[13px]"
+                          >
+                            {on && <Check className="size-3.5" aria-hidden />}
+                            {i.name}
+                            {i.assignee && i.assignee !== meId && <span className="opacity-70">· {names.get(i.assignee)}</span>}
+                          </Chip>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                <Input
+                  id="items"
+                  placeholder="rice 5kg, oil, soap"
+                  value={form.itemsText}
+                  maxLength={600}
+                  onChange={(e) => set({ itemsText: e.target.value })}
+                  className="h-11"
+                />
+              </div>
+            )}
+
             <fieldset className="space-y-2">
               <div className="flex items-center justify-between">
                 <legend className="text-sm font-medium">{income ? "Received by" : "Paid by"}</legend>
@@ -434,22 +595,39 @@ export function ExpenseSheet({
                   ))}
                 </div>
               ) : (
-                <div className="divide-y rounded-xl border bg-card">
-                  {people.map((m) => (
-                    <label key={m.id} className="flex items-center gap-3 px-3 py-2">
-                      <MemberAvatar id={m.id} name={m.name} className="size-8" />
-                      <span className="flex-1 truncate text-sm">{m.id === meId ? "You" : m.name}</span>
-                      <Input
-                        inputMode="decimal"
-                        placeholder="0"
-                        value={form.payerAmounts[m.id] ?? ""}
-                        onChange={(e) => set({ payerAmounts: { ...form.payerAmounts, [m.id]: e.target.value } })}
-                        className="h-10 w-28 text-right tabular"
-                        aria-label={`${m.name} paid`}
-                      />
-                    </label>
-                  ))}
-                </div>
+                <>
+                  <div className="divide-y rounded-xl border bg-card">
+                    {people.map((m) => {
+                      const on = !!form.payers[m.id]
+                      return (
+                        <div key={m.id} className="flex min-h-13 items-center gap-2 px-3 py-2">
+                          <PersonToggle on={on} onClick={() => togglePayer(m.id)} id={m.id} name={m.name} label={m.id === meId ? "You" : m.name} />
+                          {on && payLeft > 0 && !!amount && (
+                            <RestButton
+                              onClick={() => addRest("payerAmounts", m.id, payLeft, payFill.amounts[m.id] ?? 0)}
+                              label={`${m.name} paid the rest`}
+                            />
+                          )}
+                          {on && (
+                            <AmountBox
+                              text={form.payerAmounts[m.id] ?? ""}
+                              auto={payFill.auto.has(m.id)}
+                              value={payFill.amounts[m.id] ?? 0}
+                              currency={cur}
+                              onChange={(text) => set({ payerAmounts: { ...form.payerAmounts, [m.id]: text } })}
+                              label={`${m.name} paid`}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <AutoHint
+                    typed={payerIds.some((id) => !payFill.auto.has(id))}
+                    onReset={() => set({ payerAmounts: {} })}
+                    text="Tick who paid. Type what someone paid and the others' share of the rest fills in by itself."
+                  />
+                </>
               )}
               {showErrors && errors.paid && (
                 <p role="alert" className="text-sm text-destructive">
@@ -471,6 +649,22 @@ export function ExpenseSheet({
                   ...(trip.mealMode || form.splitMode === "meals" ? [{ value: "meals" as const, label: "Meals" }] : []),
                 ]}
               />
+              {suggestLast && (
+                <button
+                  type="button"
+                  onClick={applyLast}
+                  className="flex w-full items-center gap-3 rounded-xl border border-dashed border-primary/40 bg-accent/40 px-3 py-2 text-left active:bg-accent"
+                >
+                  <History className="size-4 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1 text-xs">
+                    <span className="block font-medium">Split like last “{suggestLast.title}”?</span>
+                    <span className="block truncate text-muted-foreground">
+                      {MODE_LABEL[suggestLast.splitMode]} · {lastIds.map(who).join(", ")}
+                    </span>
+                  </span>
+                  <span className="text-sm font-semibold text-primary">Use</span>
+                </button>
+              )}
               <div className="divide-y rounded-xl border bg-card">
                 {people.map((m) => {
                   const share = preview[m.id] ?? 0
@@ -527,19 +721,27 @@ export function ExpenseSheet({
                       </div>
                     )
                   }
+                  const on = !!form.included[m.id]
                   return (
-                    <label key={m.id} className="flex min-h-13 items-center gap-3 px-3 py-2">
-                      <MemberAvatar id={m.id} name={m.name} className="size-8" />
-                      <span className="flex-1 truncate text-sm">{name}</span>
-                      <Input
-                        inputMode="decimal"
-                        placeholder="0"
-                        value={form.exact[m.id] ?? ""}
-                        onChange={(e) => set({ exact: { ...form.exact, [m.id]: e.target.value } })}
-                        className="h-10 w-28 text-right tabular"
-                        aria-label={`${m.name} owes`}
-                      />
-                    </label>
+                    <div key={m.id} className="flex min-h-13 items-center gap-2 px-3 py-2">
+                      <PersonToggle on={on} onClick={() => toggleSharer(m.id)} id={m.id} name={m.name} label={name} />
+                      {on && splitLeft > 0 && !!amount && (
+                        <RestButton
+                          onClick={() => addRest("exact", m.id, splitLeft, exactFill.amounts[m.id] ?? 0)}
+                          label={`${m.name} owes the rest`}
+                        />
+                      )}
+                      {on && (
+                        <AmountBox
+                          text={form.exact[m.id] ?? ""}
+                          auto={exactFill.auto.has(m.id)}
+                          value={exactFill.amounts[m.id] ?? 0}
+                          currency={cur}
+                          onChange={(text) => set({ exact: { ...form.exact, [m.id]: text } })}
+                          label={`${m.name} owes`}
+                        />
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -568,7 +770,25 @@ export function ExpenseSheet({
                 </div>
               )}
               {form.splitMode === "shares" && (
-                <p className="text-xs text-muted-foreground">Tip: give a couple 2 shares, skip someone with 0.</p>
+                <p className="text-xs text-muted-foreground">Someone uses twice as much? Give them 2 shares. 0 leaves them out.</p>
+              )}
+              {form.splitMode === "exact" && (
+                <>
+                  {amount ? (
+                    <p className={cn("text-sm", splitLeft === 0 ? "text-muted-foreground" : "font-medium text-destructive")}>
+                      {splitLeft === 0
+                        ? `Adds up to ${formatMoney(amount, cur)}`
+                        : splitLeft > 0
+                          ? `${formatMoney(splitLeft, cur)} left · tap Rest on someone`
+                          : `${formatMoney(-splitLeft, cur)} over the total`}
+                    </p>
+                  ) : null}
+                  <AutoHint
+                    typed={sharerIds.some((id) => !exactFill.auto.has(id))}
+                    onReset={() => set({ exact: {} })}
+                    text="Type anyone's amount and the others share what's left equally. Untick people who aren't in it."
+                  />
+                </>
               )}
               {showErrors && errors.split && (
                 <p role="alert" className="text-sm text-destructive">
@@ -576,6 +796,12 @@ export function ExpenseSheet({
                 </p>
               )}
             </fieldset>
+
+            {liveTransfers.length > 0 && (
+              <BreakdownSection title="Who owes whom" aside={liveTransfers.length > 1 ? `${liveTransfers.length} payments` : undefined}>
+                <WhoOwesWhom transfers={liveTransfers} />
+              </BreakdownSection>
+            )}
 
             <div className="space-y-2">
               <span className="text-sm font-medium">Category</span>
@@ -654,6 +880,33 @@ export function ExpenseSheet({
             </div>
           </div>
 
+          <ReviewDialog
+            open={reviewing}
+            title={expense ? "Save these changes?" : income ? "Add this money in?" : form.category === "loan" ? "Add this loan?" : "Add this expense?"}
+            confirmLabel={expense ? "Save" : `Add ${amount ? formatMoney(amount, cur) : ""}`}
+            onConfirm={commit}
+            onCancel={() => setReviewing(false)}
+          >
+            {expense && <ChangeList changes={changes} />}
+            <WarningList
+              warnings={warnings}
+              action={(w) =>
+                w.kind === "self-only" && w.id === meId && !expense && !form.billId ? (
+                  <button type="button" onClick={saveAsPersonal} className="mt-1 min-h-8 font-semibold text-primary underline-offset-2 hover:underline">
+                    Save as personal instead
+                  </button>
+                ) : null
+              }
+            />
+            <ExpenseBreakdown expense={draft} />
+            {input.note && (
+              <p className="rounded-xl border bg-card px-3 py-2 text-sm">
+                <span className="block text-[11px] text-muted-foreground">Note</span>
+                {input.note}
+              </p>
+            )}
+          </ReviewDialog>
+
           <DrawerFooter className="border-t pt-3 pb-[max(1rem,var(--sab))]">
             <Button size="lg" className="h-12 w-full text-base" onClick={save} disabled={submitted && !valid}>
               {expense
@@ -669,4 +922,117 @@ export function ExpenseSheet({
       </DrawerContent>
     </Drawer>
   )
+}
+
+function RestButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        // Inside a <label>: don't also focus the input
+        e.preventDefault()
+        onClick()
+      }}
+      className="min-h-9 shrink-0 rounded-full border border-dashed border-primary/50 px-2.5 text-xs font-medium text-primary active:bg-accent"
+      aria-label={label}
+    >
+      Rest
+    </button>
+  )
+}
+
+/** Tick box + avatar + name, used to pick payers and sharers */
+function PersonToggle({ on, onClick, id, name, label }: { on: boolean; onClick: () => void; id: string; name: string; label: string }) {
+  return (
+    <button type="button" role="checkbox" aria-checked={on} onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <span
+        className={cn(
+          "inline-flex size-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+          on ? "border-primary bg-primary text-primary-foreground" : "border-input"
+        )}
+      >
+        {on && <Check className="size-4" strokeWidth={3} aria-hidden />}
+      </span>
+      <MemberAvatar id={id} name={name} className="size-8" />
+      <span className={cn("truncate text-sm", !on && "text-muted-foreground")}>{label}</span>
+    </button>
+  )
+}
+
+/** Amount box that shows the app's filled-in amount until someone types their own */
+function AmountBox({
+  text,
+  auto,
+  value,
+  currency,
+  onChange,
+  label,
+}: {
+  text: string
+  auto: boolean
+  value: number
+  currency: string
+  onChange: (text: string) => void
+  label: string
+}) {
+  return (
+    <div className="relative shrink-0">
+      {auto && (
+        <span className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-[10px] font-semibold tracking-wide text-primary uppercase">
+          auto
+        </span>
+      )}
+      <Input
+        inputMode="decimal"
+        placeholder={auto ? minorToInput(value, currency) : "0"}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn("h-10 w-28 text-right tabular", auto && "border-dashed placeholder:text-foreground/70")}
+        aria-label={auto ? `${label}, filled in: ${minorToInput(value, currency)}` : label}
+      />
+    </div>
+  )
+}
+
+function AutoHint({ typed, onReset, text }: { typed: boolean; onReset: () => void; text: string }) {
+  return (
+    <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
+      <p>{text}</p>
+      {typed && (
+        <button type="button" onClick={onReset} className="min-h-8 shrink-0 font-medium text-primary">
+          Split evenly
+        </button>
+      )}
+    </div>
+  )
+}
+
+const MODE_LABEL: Record<SplitMode, string> = { equal: "Equally", shares: "By shares", exact: "Amounts", meals: "By meals" }
+
+/** What an edit changes, field by field, in words */
+function describeChanges(before: Expense, after: Expense, who: (id: string) => string) {
+  const out: { label: string; from: string; to: string }[] = []
+  const add = (label: string, from: string, to: string) => {
+    if (from !== to) out.push({ label, from, to })
+  }
+  const paid = (e: Expense) =>
+    Object.entries(e.paidBy)
+      .map(([id, v]) => `${who(id)} ${formatMoney(v, e.currency)}`)
+      .join(", ")
+  const split = (e: Expense) => {
+    const people = Object.entries(e.split).map(([id, v]) =>
+      e.splitMode === "shares" ? `${who(id)} x${v}` : e.splitMode === "exact" ? `${who(id)} ${formatMoney(v, e.currency)}` : who(id)
+    )
+    return `${MODE_LABEL[e.splitMode]}: ${people.join(", ")}`
+  }
+  add("Amount", formatMoney(before.amount, before.currency), formatMoney(after.amount, after.currency))
+  add("What for", before.title, after.title)
+  add("Category", getCategory(before.category).label, getCategory(after.category).label)
+  add("Date", dayLabel(before.date), dayLabel(after.date))
+  add(after.kind === "income" ? "Received by" : "Paid by", paid(before), paid(after))
+  add("Split", split(before), split(after))
+  add("Items", (before.items ?? []).join(", "), (after.items ?? []).join(", "))
+  add("Note", before.note ?? "", after.note ?? "")
+  add("Photo", before.receipt ? "Photo" : "", after.receipt ? "Photo" : "")
+  return out
 }

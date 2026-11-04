@@ -43,4 +43,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Without it the WebView can't see the network: navigator.onLine stays true and no offline events fire -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- In-app updates (ApkUpdaterPlugin): hand the downloaded APK to Android's installer -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

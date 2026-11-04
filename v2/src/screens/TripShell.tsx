@@ -1,20 +1,26 @@
-import { ChevronLeft, HandCoins, House, LayoutGrid, Plus, Receipt, UserPlus } from "lucide-react"
+import { Bell, ChevronLeft, HandCoins, House, LayoutGrid, Plus, Receipt, Wallet } from "lucide-react"
 import { lazy, Suspense, useEffect, useState } from "react"
-import { Link, Route, Switch, useLocation } from "wouter"
+import { Link, Route, Switch, useLocation, useSearch } from "wouter"
 import { AddSheet } from "@/components/AddSheet"
 import { BillSheet } from "@/components/BillSheet"
 import { Splash } from "@/components/common"
+import { DetailSheet, type DetailTarget } from "@/components/DetailSheet"
 import { ExpenseSheet, type ExpensePreset } from "@/components/ExpenseSheet"
+import { InboxSheet } from "@/components/InboxSheet"
+import { MemberSheet } from "@/components/MemberSheet"
 import { PaymentSheet } from "@/components/PaymentSheet"
+import { PersonalSheet, type PersonalPreset } from "@/components/PersonalSheet"
 import { SyncBadge } from "@/components/SyncBadge"
 import { WhoAreYou } from "@/components/WhoAreYou"
 import { Button } from "@/components/ui/button"
 import { ActionsContext, type TripActions } from "@/hooks/useTripActions"
-import { TripContext, useTripQuery, type BillStatus } from "@/hooks/useTripData"
+import { useInbox } from "@/hooks/useInbox"
+import { TripContext, useTrip, useTripQuery, type BillStatus } from "@/hooks/useTripData"
+import { toISODate } from "@/lib/dates"
 import type { Transfer } from "@/lib/balance"
 import { monthLabel } from "@/lib/dates"
 import { rememberTrip } from "@/lib/nav"
-import type { Bill, Expense } from "@/lib/types"
+import type { Bill, Expense, PersonalExpense } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ActivityTab } from "./ActivityTab"
 import { BalancesTab } from "./BalancesTab"
@@ -23,6 +29,7 @@ import { MoreTab } from "./MoreTab"
 import { OverviewTab } from "./OverviewTab"
 
 const StatsTab = lazy(() => import("./StatsTab"))
+const PersonalTab = lazy(() => import("./PersonalTab"))
 const SettingsTab = lazy(() => import("./SettingsTab"))
 const BillsScreen = lazy(() => import("./BillsScreen"))
 const MealsScreen = lazy(() => import("./MealsScreen"))
@@ -34,6 +41,9 @@ type Sheet =
   | { kind: "payment"; suggestion: Transfer | null }
   | { kind: "bill"; bill: Bill | null }
   | { kind: "add" }
+  | { kind: "detail"; target: DetailTarget }
+  | { kind: "personal"; item: PersonalExpense | null; preset: PersonalPreset | null }
+  | { kind: "member"; memberId: string }
 
 export function TripShell({ id }: { id: string }) {
   const data = useTripQuery(id)
@@ -81,6 +91,11 @@ export function TripShell({ id }: { id: string }) {
     openAdd: () => open({ kind: "add" }),
     addExpense,
     editExpense: (expense) => open({ kind: "expense", expense, preset: null }),
+    viewExpense: (expense) => open({ kind: "detail", target: { kind: "expense", expense } }),
+    viewPayment: (payment) => open({ kind: "detail", target: { kind: "payment", payment } }),
+    addPersonal: (preset) => open({ kind: "personal", item: null, preset: preset ?? null }),
+    editPersonal: (item) => open({ kind: "personal", item, preset: null }),
+    viewMember: (memberId) => open({ kind: "member", memberId }),
     recordPayment: (suggestion) => open({ kind: "payment", suggestion: suggestion ?? null }),
     payBill,
     editBill: (bill) => open({ kind: "bill", bill: bill ?? null }),
@@ -91,6 +106,9 @@ export function TripShell({ id }: { id: string }) {
   const exp = last.expense?.kind === "expense" ? last.expense : null
   const pay = last.payment?.kind === "payment" ? last.payment : null
   const bill = last.bill?.kind === "bill" ? last.bill : null
+  const detail = last.detail?.kind === "detail" ? last.detail : null
+  const personal = last.personal?.kind === "personal" ? last.personal : null
+  const member = last.member?.kind === "member" ? last.member : null
 
   return (
     <TripContext.Provider value={data}>
@@ -110,9 +128,8 @@ export function TripShell({ id }: { id: string }) {
                 {data.trip.name}
               </h1>
               <SyncBadge pending={data.pending} />
-              <Button variant="ghost" size="icon" className="size-11" onClick={actions.invite} aria-label="Invite people">
-                <UserPlus className="size-5" />
-              </Button>
+              <InboxButton onInvite={actions.invite} />
+              <MoreButton />
             </div>
           </header>
 
@@ -122,6 +139,7 @@ export function TripShell({ id }: { id: string }) {
                 <Route path="/" component={OverviewTab} />
                 <Route path="/activity" component={ActivityTab} />
                 <Route path="/balances" component={BalancesTab} />
+                <Route path="/personal" component={PersonalTab} />
                 <Route path="/more" component={MoreTab} />
                 <Route path="/bills" component={BillsScreen} />
                 <Route path="/meals" component={MealsScreen} />
@@ -132,7 +150,7 @@ export function TripShell({ id }: { id: string }) {
             </Suspense>
           </main>
 
-          <BottomNav onAdd={actions.openAdd} home={data.kind === "home"} />
+          <BottomNav onAdd={actions.openAdd} onAddPersonal={() => actions.addPersonal()} home={data.kind === "home"} />
         </div>
 
         <AddSheet open={sheet?.kind === "add"} onOpenChange={onOpenChange} />
@@ -144,6 +162,9 @@ export function TripShell({ id }: { id: string }) {
         />
         <PaymentSheet open={sheet?.kind === "payment"} onOpenChange={onOpenChange} suggestion={pay?.suggestion} />
         <BillSheet open={sheet?.kind === "bill"} onOpenChange={onOpenChange} bill={bill?.bill} />
+        <DetailSheet open={sheet?.kind === "detail"} onOpenChange={onOpenChange} target={detail?.target} />
+        <PersonalSheet open={sheet?.kind === "personal"} onOpenChange={onOpenChange} item={personal?.item} preset={personal?.preset} />
+        <MemberSheet open={sheet?.kind === "member"} onOpenChange={onOpenChange} memberId={member?.memberId} />
         {shareOpen && (
           <Suspense>
             <ShareDialog trip={data.trip} open={shareOpen} onOpenChange={setShareOpen} />
@@ -162,14 +183,80 @@ export function TripShell({ id }: { id: string }) {
 
 const SUB_PAGES = ["/more", "/bills", "/meals", "/list", "/stats", "/settings"]
 
-function BottomNav({ onAdd, home }: { onAdd: () => void; home: boolean }) {
+/**
+ * Bell with the number of things that are new or need you. Also handles links
+ * like /t/<id>?inbox (from a notification or the dashboard) and ?invite.
+ */
+function InboxButton({ onInvite }: { onInvite: () => void }) {
+  const data = useTrip()
+  const { events, unread, lastSeen, markSeen } = useInbox(data)
+  const [open, setOpen] = useState(false)
+  const search = useSearch()
+  const [location, navigate] = useLocation()
+
+  useEffect(() => {
+    const params = new URLSearchParams(search)
+    if (!params.has("inbox") && !params.has("invite")) return
+    if (params.has("inbox")) setOpen(true)
+    if (params.has("invite")) onInvite()
+    navigate(location, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  const today = toISODate()
+  const urgent = data.billStatus.filter((b) => !b.paid && b.due < today).length
+  const count = unread + urgent
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative size-11"
+        onClick={() => setOpen(true)}
+        aria-label={count ? `Updates, ${count} new` : "Updates"}
+      >
+        <Bell className="size-5" />
+        {count > 0 && (
+          <span className="absolute top-1.5 right-1.5 inline-flex min-w-4.5 items-center justify-center rounded-full bg-negative px-1 text-[10px] leading-4.5 font-bold text-white">
+            {count > 9 ? "9+" : count}
+          </span>
+        )}
+      </Button>
+      <InboxSheet
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o)
+          if (!o) markSeen()
+        }}
+        events={events}
+        lastSeen={lastSeen}
+      />
+    </>
+  )
+}
+
+/** Bills, meals, list, insights and settings live behind this (the tab bar holds Personal instead) */
+function MoreButton() {
   const [location] = useLocation()
+  const active = SUB_PAGES.includes(location)
+  return (
+    <Button variant="ghost" size="icon" className={cn("size-11", active && "text-primary")} asChild>
+      <Link href="/more" aria-label="More: bills, meals, list, insights, settings" aria-current={active ? "page" : undefined}>
+        <LayoutGrid className="size-5" strokeWidth={active ? 2.4 : 2} />
+      </Link>
+    </Button>
+  )
+}
+
+function BottomNav({ onAdd, onAddPersonal, home }: { onAdd: () => void; onAddPersonal: () => void; home: boolean }) {
+  const [location] = useLocation()
+  const onPersonal = location === "/personal"
   const tabs = [
     { href: "/", label: home ? "Home" : "Overview", icon: House, active: location === "/" },
     { href: "/activity", label: "Activity", icon: Receipt, active: location === "/activity" },
     null,
     { href: "/balances", label: "Balances", icon: HandCoins, active: location === "/balances" },
-    { href: "/more", label: "More", icon: LayoutGrid, active: SUB_PAGES.includes(location) },
+    { href: "/personal", label: "Personal", icon: Wallet, active: onPersonal },
   ]
   return (
     <nav aria-label="Sections" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 backdrop-blur-md">
@@ -179,8 +266,9 @@ function BottomNav({ onAdd, home }: { onAdd: () => void; home: boolean }) {
             <div key="add" className="flex justify-center">
               <button
                 type="button"
-                onClick={onAdd}
-                aria-label="Add"
+                // On Personal, + adds a personal expense straight away
+                onClick={onPersonal ? onAddPersonal : onAdd}
+                aria-label={onPersonal ? "Add personal expense" : "Add"}
                 className="-mt-7 inline-flex size-15 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform active:scale-95"
               >
                 <Plus className="size-7" strokeWidth={2.5} />

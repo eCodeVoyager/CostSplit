@@ -36,6 +36,8 @@ export default defineConfig({
         // /download is its own static page, not part of the app
         navigateFallbackDenylist: [/^\/api\//, /^\/download/],
         globIgnores: ["download/**"],
+        // Notification taps (public/notify-sw.js)
+        importScripts: ["notify-sw.js"],
       },
     }),
   ],

@@ -7,10 +7,11 @@ import {
   Repeat2,
   ShoppingCart,
   UtensilsCrossed,
+  Wallet,
   Zap,
   type LucideIcon,
 } from "lucide-react"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { UNDO_MS } from "@/lib/utils"
 import { useLocation } from "wouter"
@@ -21,8 +22,11 @@ import { useTrip } from "@/hooks/useTripData"
 import { toISODate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import { saveExpense, softDelete } from "@/lib/repo"
+import { expenseWarnings, usePrefs } from "@/lib/review"
 import type { Expense } from "@/lib/types"
+import { ExpenseBreakdown, WarningList } from "./breakdown"
 import { CategoryIcon } from "./common"
+import { ReviewDialog } from "./ReviewDialog"
 
 interface Tile {
   key: string
@@ -35,8 +39,10 @@ interface Tile {
 /** What the "+" button opens: every way money moves in a shared home, one tap each */
 export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { trip, kind, expenses, billStatus, meId, names } = useTrip()
-  const { addExpense, recordPayment, payBill } = useTripActions()
+  const { addExpense, recordPayment, payBill, addPersonal } = useTripActions()
   const [, navigate] = useLocation()
+  const prefs = usePrefs()
+  const [repeating, setRepeating] = useState<Expense | null>(null)
   useBackClose(open, () => onOpenChange(false))
 
   // Close first, then open the next sheet once this one has left the history stack
@@ -105,6 +111,7 @@ export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
       ? [{ key: "meals", label: "Meals", hint: "Count today", icon: UtensilsCrossed, run: then(() => navigate("/meals")) }]
       : []),
     ...(home ? [{ key: "list", label: "To-buy list", hint: "Shared list", icon: ListChecks, run: then(() => navigate("/list")) }] : []),
+    { key: "personal", label: "Personal", hint: "Only you see it", icon: Wallet, run: then(() => addPersonal()) },
   ]
 
   // Daily things (bus fare, water, snacks) repeat a lot: re-add with one tap
@@ -122,10 +129,33 @@ export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
     return out
   }, [expenses])
 
-  const repeat = async (e: Expense) => {
+  /** The repeated expense as it would be saved: same people and split, dated today */
+  const copyOf = (e: Expense) => {
+    const {
+      id: _id,
+      tripId: _t,
+      createdAt: _c,
+      updatedAt: _u,
+      deleted: _d,
+      dirty: _x,
+      note: _n,
+      receipt: _r,
+      createdBy: _cb,
+      updatedBy: _ub,
+      ...copy
+    } = e
+    return { ...copy, date: toISODate() }
+  }
+
+  const repeat = (e: Expense) => {
+    if (prefs.review) setRepeating(e)
+    else commitRepeat(e)
+  }
+
+  const commitRepeat = async (e: Expense) => {
+    setRepeating(null)
     onOpenChange(false)
-    const { id: _id, tripId: _t, createdAt: _c, updatedAt: _u, deleted: _d, dirty: _x, note: _n, receipt: _r, ...copy } = e
-    const id = await saveExpense(trip.id, { ...copy, date: toISODate() })
+    const id = await saveExpense(trip.id, copyOf(e), undefined, meId)
     navigator.vibrate?.(15)
     toast.success(`Added ${e.title} ${formatMoney(e.amount, e.currency)}`, {
       duration: UNDO_MS, action: { label: "Undo", onClick: () => softDelete("expenses", id) },
@@ -135,6 +165,30 @@ export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[90dvh]">
+        {repeating && (
+          <ReviewDialog
+            open={!!repeating}
+            title="Add this again today?"
+            confirmLabel={`Add ${formatMoney(repeating.amount, repeating.currency)}`}
+            onConfirm={() => commitRepeat(repeating)}
+            onCancel={() => setRepeating(null)}
+            onEdit={() => {
+              const e = repeating
+              setRepeating(null)
+              then(() => addExpense({ copyOf: e }))()
+            }}
+          >
+            <WarningList
+              warnings={expenseWarnings(
+                { ...copyOf(repeating), kind: repeating.kind ?? "expense" },
+                expenses,
+                trip,
+                toISODate()
+              ).filter((w) => w.kind !== "duplicate" || w.expense.date === toISODate())}
+            />
+            <ExpenseBreakdown expense={{ ...repeating, ...copyOf(repeating), id: "draft" }} />
+          </ReviewDialog>
+        )}
         <div className="mx-auto w-full max-w-lg overflow-y-auto px-4 pb-[max(1.25rem,var(--sab))]">
           <DrawerHeader className="px-0 text-left">
             <DrawerTitle className="text-lg">Add</DrawerTitle>
@@ -177,7 +231,12 @@ export function AddSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{e.title}</span>
                           <span className="block truncate text-xs text-muted-foreground">
-                            {payer === meId ? "You" : names.get(payer)} paid ·{" "}
+                            {Object.keys(e.paidBy).length > 1
+                              ? `${Object.keys(e.paidBy).length} people`
+                              : payer === meId
+                                ? "You"
+                                : names.get(payer)}{" "}
+                            paid ·{" "}
                             {Object.keys(e.split).length} {Object.keys(e.split).length === 1 ? "person" : "people"}
                           </span>
                         </span>

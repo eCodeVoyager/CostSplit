@@ -12,8 +12,11 @@ import type { Transfer } from "@/lib/balance"
 import { toISODate } from "@/lib/dates"
 import { currencySymbol, formatMoney, minorToInput, parseAmount } from "@/lib/money"
 import { addPayment, softDelete } from "@/lib/repo"
-import { Chip, MemberAvatar } from "./common"
+import { paymentWarnings, usePrefs } from "@/lib/review"
+import { BreakdownSection, WarningList } from "./breakdown"
+import { BalanceText, Chip, MemberAvatar } from "./common"
 import { PhotoField } from "./PhotoField"
+import { ReviewDialog } from "./ReviewDialog"
 
 /** Record money handed over between two people ("Sakib paid Ehsan €25") */
 export function PaymentSheet({
@@ -25,7 +28,9 @@ export function PaymentSheet({
   onOpenChange: (open: boolean) => void
   suggestion?: Transfer | null
 }) {
-  const { trip, members, meId, names } = useTrip()
+  const { trip, members, meId, names, balances, payments } = useTrip()
+  const prefs = usePrefs()
+  const [reviewing, setReviewing] = useState(false)
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
   const [amountText, setAmountText] = useState("")
@@ -42,22 +47,37 @@ export function PaymentSheet({
     setAmountText(suggestion ? minorToInput(suggestion.amount, trip.currency) : "")
     setNote("")
     setProof(undefined)
+    setReviewing(false)
   }, [open, suggestion, meId, trip.currency])
 
   const amount = parseAmount(amountText, trip.currency)
   const valid = !!amount && !!from && !!to && from !== to
   const label = (id: string) => (id === meId ? "You" : (names.get(id) ?? "?"))
 
-  const save = async () => {
+  const nets = Object.fromEntries(balances.map((b) => [b.memberId, b.net]))
+  const warnings = reviewing && amount ? paymentWarnings({ from, to, amount, date: toISODate() }, payments, nets, toISODate()) : []
+
+  const save = () => {
     if (!valid || !amount) return
-    const id = await addPayment(trip.id, {
-      from,
-      to,
-      amount,
-      date: toISODate(),
-      ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}),
-      ...(proof ? { proof } : {}),
-    })
+    if (prefs.review) setReviewing(true)
+    else commit()
+  }
+
+  const commit = async () => {
+    if (!valid || !amount) return
+    setReviewing(false)
+    const id = await addPayment(
+      trip.id,
+      {
+        from,
+        to,
+        amount,
+        date: toISODate(),
+        ...(note.trim() ? { note: note.trim().slice(0, 200) } : {}),
+        ...(proof ? { proof } : {}),
+      },
+      meId
+    )
     navigator.vibrate?.(15)
     close()
     toast.success(`${label(from)} paid ${to === meId ? "you" : label(to)} ${formatMoney(amount, trip.currency)}`, {
@@ -132,6 +152,51 @@ export function PaymentSheet({
               <p className="text-xs text-muted-foreground">Optional: a screenshot of the transfer or a photo of the cash receipt.</p>
             </div>
           </div>
+
+          <ReviewDialog
+            open={reviewing}
+            title="Record this payment?"
+            confirmLabel={`Record ${amount ? formatMoney(amount, trip.currency) : ""}`}
+            onConfirm={commit}
+            onCancel={() => setReviewing(false)}
+          >
+            {amount && from && to ? (
+              <>
+                <div className="flex flex-col items-center gap-2 rounded-2xl bg-secondary/70 py-4">
+                  <div className="flex items-center gap-3">
+                    <MemberAvatar id={from} name={names.get(from) ?? "?"} className="size-11" />
+                    <ArrowRight className="size-5 text-muted-foreground" aria-hidden />
+                    <MemberAvatar id={to} name={names.get(to) ?? "?"} className="size-11" />
+                  </div>
+                  <p className="text-sm">
+                    <strong>{label(from)}</strong> {from === meId ? "give" : "gives"} <strong>{to === meId ? "you" : label(to)}</strong>
+                  </p>
+                  <p className="text-2xl font-bold tabular">{formatMoney(amount, trip.currency)}</p>
+                  <p className="text-xs text-muted-foreground">Today{note.trim() ? ` · ${note.trim()}` : ""}{proof ? " · with proof photo" : ""}</p>
+                </div>
+                <WarningList warnings={warnings} />
+                <BreakdownSection title="Balances after this">
+                  {[from, to].map((id) => {
+                    const before = nets[id] ?? 0
+                    const after = before + (id === from ? amount : -amount)
+                    return (
+                      <div key={id} className="flex min-h-11 items-center gap-2.5 px-3 py-2">
+                        <MemberAvatar id={id} name={names.get(id) ?? "?"} className="size-7 text-[10px]" />
+                        <div className="min-w-0 flex-1 text-sm">
+                          <p className="truncate">{label(id)}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            now <BalanceText net={before} currency={trip.currency} you={id === meId} />
+                          </p>
+                        </div>
+                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <BalanceText net={after} currency={trip.currency} you={id === meId} className="w-32 text-right text-xs" />
+                      </div>
+                    )
+                  })}
+                </BreakdownSection>
+              </>
+            ) : null}
+          </ReviewDialog>
 
           <DrawerFooter className="border-t pt-3 pb-[max(1rem,var(--sab))]">
             <Button size="lg" className="h-12 w-full text-base" onClick={save} disabled={!valid}>
