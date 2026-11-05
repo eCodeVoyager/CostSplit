@@ -121,7 +121,13 @@ Both need `VITE_SERVER_URL` (https sync server) and `VITE_PUBLIC_URL` (where the
 npm run release
 ```
 
-Checks the config, builds the signed APK (debug with a warning if there's no keystore) and the web app, and writes `dist/download/` with `costsplit.apk`, `costsplit-<version>.apk`, `version.json` (size, sha256) and `qr.svg`. Upload all of `dist/`.
+Checks the config, builds the signed APK (debug with a warning if there's no keystore) and the web app, and writes `dist/download/` with `costsplit.apk`, `costsplit-<version>.apk`, `bundle-<version>.zip` (live update), `version.json` (size, sha256) and `qr.svg`. Upload all of `dist/`.
+
+**Live updates (Android app 2.3.0+).** Most releases reach installed apps without a reinstall. `bundle-<version>.zip` is the web part exactly as the APK ships it. The app checks `version.json` on launch and hourly, downloads the zip (~1 MB), verifies its SHA-256, unpacks it to `files/bundles/<version>` and points Capacitor's web server there (`LiveUpdates.java`). It switches in on the next app start, or when the user returns after a few minutes away, or right away with **Restart now** in Settings. The new version must confirm it started (`confirmBundle`, once React has rendered). One that doesn't within 20 s on screen, or before the next start, is rolled back to the last good version and never offered again; that version then goes out as an APK update. Installing a new APK drops all downloaded versions.
+
+A live update only fits apps with the same native part. `release.mjs` fingerprints it (Java code, manifest, resources, Gradle files, `capacitor.config.ts`, Capacitor plugin versions) and keeps `android/native-versions.json` (commit it). When the fingerprint changes, `bundle.minNative` moves to this version: older apps get the APK (one tap, Android's installer) and newer ones keep updating live.
+
+**Play Protect.** Phones show "Send app for scanning?" / "Install without scanning" for an APK from a developer Google doesn't know. Live updates avoid it after the first install. To have the app recognised, register as a developer in the [Android Developer Console](https://developer.android.com/developer-verification) and register package `app.costsplit` with the release key's SHA-256 (it's in `dist/.well-known/assetlinks.json` after a signed release). Until then, users tap **Scan app**.
 
 ### 4. Sync server
 
@@ -178,7 +184,7 @@ bash deploy/deploy.sh s3 costsplit.tapspot.tech
 1. `https://api…/api/health` returns `{"ok":true}`.
 2. Open `/download/` on an Android phone, install, create a home.
 3. Share the invite link, open it on another phone (web), pick a name: same balances on both.
-4. Ship the next version: bump `package.json`, `npm run release`, deploy. The installed app shows "CostSplit x.y.z is available".
+4. Ship the next version: bump `package.json`, `npm run release`, deploy. Installed apps update by themselves (live update) or, if the native part changed, show "CostSplit x.y.z is available".
 
 ### Production defaults already in place
 

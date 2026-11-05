@@ -48,6 +48,7 @@ const MIME = {
   ".ico": "image/x-icon",
   ".txt": "text/plain; charset=utf-8",
   ".apk": "application/vnd.android.package-archive",
+  ".zip": "application/zip",
 }
 
 /** Trip storage: { seq, users: [userId], records: { "table:id": { table, seq, updatedAt, data } } } */

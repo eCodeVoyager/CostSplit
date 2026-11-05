@@ -6,7 +6,7 @@ import { LAST_TRIP_KEY } from "./lib/nav"
 import { isNative } from "./lib/server"
 import { startSync } from "./lib/sync"
 import { applyTheme } from "./lib/theme"
-import { checkForUpdate, reloadOnStaleChunks, startWebUpdates } from "./lib/update"
+import { checkForUpdate, reloadOnStaleChunks, startLiveUpdates, startWebUpdates } from "./lib/update"
 import "./index.css"
 
 applyTheme()
@@ -26,7 +26,9 @@ startSync()
 // The Android app ships its files inside the APK; only the website needs a service worker
 if (!isNative) startWebUpdates().catch(() => {})
 else {
-  // Look for a newer APK on launch and whenever the app comes back (at most every few hours)
+  // Keeps a live update once it has started fine, and switches in a downloaded one
+  startLiveUpdates()
+  // Look for a newer version on launch and whenever the app comes back (at most hourly)
   setTimeout(() => checkForUpdate(), 4000)
   NativeApp.addListener("resume", () => checkForUpdate())
   // Invite links open the app (App Links): show the same screen the website would

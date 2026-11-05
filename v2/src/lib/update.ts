@@ -1,9 +1,11 @@
+import { App as NativeApp } from "@capacitor/app"
 import { registerPlugin, type PluginListenerHandle } from "@capacitor/core"
 import { useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import changelog from "./changelog.json"
 import { getPrefs } from "./review"
 import { isNative, publicOrigin } from "./server"
+import { planUpdate, type BundleInfo, type NativeInfo } from "./updatePlan"
 import { compareVersions } from "./version"
 
 export const APP_VERSION = __APP_VERSION__
@@ -17,6 +19,8 @@ export interface VersionInfo {
   notes?: string[]
   /** Older apps than this must update (e.g. after a sync format change) */
   minVersion?: string
+  /** Live update: the web part only, for apps whose native part is new enough */
+  bundle?: BundleInfo
 }
 
 export type UpdateState =
@@ -33,9 +37,127 @@ interface ApkUpdaterPlugin {
   openInstallSettings(): Promise<void>
   download(options: { url: string; sha256?: string }): Promise<{ path: string }>
   install(options: { path: string }): Promise<void>
-  addListener(event: "progress", listener: (e: { percent: number }) => void): Promise<PluginListenerHandle>
+  addListener(event: "progress" | "bundleProgress", listener: (e: { percent: number }) => void): Promise<PluginListenerHandle>
+  // Live updates (app 2.3.0 and newer)
+  info(): Promise<NativeInfo & { versionCode?: number }>
+  downloadBundle(options: { url: string; sha256: string; version: string }): Promise<{ path: string }>
+  applyBundle(options: { path: string; version: string; now: boolean }): Promise<void>
+  confirmBundle(): Promise<{ live: string }>
 }
 const ApkUpdater = registerPlugin<ApkUpdaterPlugin>("ApkUpdater")
+
+let native: Promise<NativeInfo | null> | null = null
+/** The installed APK's version and live update state; null on the website or an app older than 2.3.0 */
+export function nativeInfo(fresh = false): Promise<NativeInfo | null> {
+  if (!isNative) return Promise.resolve(null)
+  if (!native || fresh) native = ApkUpdater.info().catch(() => null)
+  return native
+}
+
+export type LiveState =
+  | { status: "idle" }
+  | { status: "downloading"; version: string; percent: number }
+  | { status: "ready"; version: string; path: string }
+
+let live: LiveState = { status: "idle" }
+function setLive(next: LiveState) {
+  live = next
+  emit()
+}
+
+export function useLiveUpdate(): LiveState {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => live
+  )
+}
+
+/** Nothing half-typed on screen (no sheet or dialog open) */
+const safeToReload = () => !document.querySelector('[role="dialog"], [role="alertdialog"]')
+
+/**
+ * Live update: download only the web part (about 1 MB), check it, and switch
+ * to it the next time the app is put away or opened. No reinstall, no Play
+ * Protect prompt. A version that fails to start is rolled back by the app.
+ */
+async function liveUpdate(info: VersionInfo, manual: boolean) {
+  const bundle = info.bundle!
+  if (live.status === "downloading") return
+  if (!(live.status === "ready" && live.version === info.version)) {
+    setLive({ status: "downloading", version: info.version, percent: 0 })
+    const handle = await ApkUpdater.addListener("bundleProgress", ({ percent }) => {
+      if (live.status === "downloading") setLive({ status: "downloading", version: info.version, percent })
+    })
+    try {
+      const { path } = await ApkUpdater.downloadBundle({
+        // The query string keeps a CDN from handing out an older zip of the same name
+        url: `${publicOrigin()}/download/${bundle.file}?v=${bundle.sha256.slice(0, 12)}`,
+        sha256: bundle.sha256,
+        version: info.version,
+      })
+      // From the next start on, even if the app is closed before switching
+      await ApkUpdater.applyBundle({ path, version: info.version, now: false })
+      setLive({ status: "ready", version: info.version, path })
+    } catch (err) {
+      setLive({ status: "idle" })
+      if (manual) toast.error("Couldn't download the update", { description: err instanceof Error ? err.message : String(err) })
+      return
+    } finally {
+      handle.remove()
+    }
+  }
+  if (isRequired(info)) {
+    // This version can't sync any more: switch as soon as nothing is open
+    const timer = setInterval(() => {
+      if (safeToReload()) {
+        clearInterval(timer)
+        applyLiveNow()
+      }
+    }, 2000)
+  } else if (manual) {
+    toast.success(`CostSplit ${info.version} is ready`, {
+      description: "It starts next time you open the app.",
+      action: { label: "Restart now", onClick: () => applyLiveNow() },
+    })
+  }
+}
+
+/** Reload into the downloaded version right away */
+export async function applyLiveNow() {
+  if (live.status !== "ready") return
+  await ApkUpdater.applyBundle({ path: live.path, version: live.version, now: true })
+}
+
+/** Away at least this long counts as "opening the app again" */
+const AWAY_MS = 3 * 60 * 1000
+
+/**
+ * Android app: the running version tells the app it started fine (so a live
+ * update is kept), and a downloaded update switches in the next time the app
+ * is opened: a fresh start, or coming back after a few minutes away. A quick
+ * trip to the photo picker or share sheet never reloads anything.
+ */
+export function startLiveUpdates() {
+  if (!isNative) return
+  // Rendered and running: this version is good
+  const confirm = () => {
+    if (document.getElementById("root")?.childElementCount) ApkUpdater.confirmBundle().catch(() => {})
+    else setTimeout(confirm, 1000)
+  }
+  setTimeout(confirm, 1500)
+  let pausedAt = 0
+  NativeApp.addListener("pause", () => {
+    pausedAt = Date.now()
+  })
+  NativeApp.addListener("resume", () => {
+    if (pausedAt && Date.now() - pausedAt >= AWAY_MS && live.status === "ready" && safeToReload()) {
+      applyLiveNow().catch(() => {})
+    }
+  })
+}
 
 let state: UpdateState = { status: "idle" }
 let sheetOpen = false
@@ -72,13 +194,16 @@ export function setUpdateSheet(open: boolean) {
 export const isRequired = (info: VersionInfo) => !!info.minVersion && compareVersions(APP_VERSION, info.minVersion) < 0
 
 const SNOOZE_KEY = "costsplit:updateSnoozed"
-const CHECK_EVERY_MS = 6 * 60 * 60 * 1000
+// version.json is tiny; live updates make checking often worth it
+const CHECK_EVERY_MS = 60 * 60 * 1000
 let lastCheck = 0
 
 /**
  * The APK is installed outside the Play Store, so the app looks for a newer
- * build on its own download page, downloads it in the background and offers
- * a one-tap install. `manual` = the user tapped "Check for updates".
+ * build on its own download page. Usually that's a live update (web part
+ * only, switched in by itself). When the native part changed it downloads the
+ * APK in the background and offers a one-tap install. `manual` = the user
+ * tapped "Check for updates".
  */
 export async function checkForUpdate({ manual = false } = {}) {
   const base = publicOrigin()
@@ -90,6 +215,13 @@ export async function checkForUpdate({ manual = false } = {}) {
     if (manual) setUpdateSheet(true)
     return
   }
+  if (manual && live.status === "ready") {
+    toast.success(`CostSplit ${live.version} is ready`, {
+      description: "It starts next time you open the app.",
+      action: { label: "Restart now", onClick: () => applyLiveNow() },
+    })
+    return
+  }
   if (!manual && Date.now() - lastCheck < CHECK_EVERY_MS) return
   lastCheck = Date.now()
   if (manual) setState({ status: "checking" })
@@ -97,9 +229,16 @@ export async function checkForUpdate({ manual = false } = {}) {
     const res = await fetch(`${base}/download/version.json`, { cache: "no-store", signal: AbortSignal.timeout(8000) })
     if (!res.ok) throw new Error(`No update info (${res.status})`)
     const info = (await res.json()) as VersionInfo
-    if (!info.version || compareVersions(info.version, APP_VERSION) <= 0) {
+    const plan = planUpdate(info, APP_VERSION, await nativeInfo(true))
+    if (plan === "latest") {
       setState({ status: "idle" })
       if (manual) toast.success(`You have the latest version (${APP_VERSION})`)
+      return
+    }
+    if (plan === "live") {
+      // Small and safe: always on its own, no sheet, no installer
+      setState({ status: "idle" })
+      await liveUpdate(info, manual)
       return
     }
     setState({ status: "available", info })

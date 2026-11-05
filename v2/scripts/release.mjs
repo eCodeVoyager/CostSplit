@@ -1,6 +1,7 @@
 // Builds everything a release needs into dist/, ready to upload:
 //   dist/                      web app (S3 / CDN / the sync server)
 //   dist/download/             download page + APK + version.json + qr.svg
+//                              + bundle-<version>.zip (live update of the app's web part)
 //
 //   node scripts/release.mjs            (npm run release)
 //
@@ -13,6 +14,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileS
 import path from "node:path"
 import { renderSVG } from "uqr"
 import { loadEnv } from "vite"
+import { minNativeVersion, nativeFingerprint, zipFolder } from "./bundle.mjs"
 
 const root = path.join(import.meta.dirname, "..")
 const { version, minAppVersion } = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))
@@ -51,6 +53,17 @@ run("npx", ["vite", "build", "--mode", "android-release", "--outDir", "dist-andr
 run("npx", ["cap", "sync", "android"])
 run("node", ["scripts/gradle.mjs", signed ? "assembleRelease" : "assembleDebug"])
 
+// Live update: exactly the web files this APK ships (after cap sync), as one zip.
+// Installed apps with the same native part switch to it without reinstalling.
+const bundleZip = zipFolder(path.join(root, "android", "app", "src", "main", "assets", "public"))
+const historyFile = path.join(root, "android", "native-versions.json")
+const { history, minNative } = minNativeVersion(
+  existsSync(historyFile) ? JSON.parse(readFileSync(historyFile, "utf8")) : [],
+  nativeFingerprint(root),
+  version
+)
+writeFileSync(historyFile, JSON.stringify(history, null, 2) + "\n")
+
 // 2. Web app (empties dist/, so it runs after the app build and before copying the APK in)
 run("npx", ["vite", "build"])
 
@@ -63,6 +76,8 @@ mkdirSync(out, { recursive: true })
 const file = `costsplit-${version}.apk`
 copyFileSync(apk, path.join(out, file))
 copyFileSync(apk, path.join(out, "costsplit.apk"))
+const bundleFile = `bundle-${version}.zip`
+writeFileSync(path.join(out, bundleFile), bundleZip)
 
 const bytes = readFileSync(apk)
 const info = {
@@ -73,6 +88,13 @@ const info = {
   date: new Date().toISOString(),
   signed,
   notes: changelog[version]?.notes ?? [],
+  // Apps whose native part matches (installed version >= minNative) update by downloading only this
+  bundle: {
+    file: bundleFile,
+    size: bundleZip.length,
+    sha256: createHash("sha256").update(bundleZip).digest("hex"),
+    minNative,
+  },
   // Apps older than this are asked to update before carrying on (package.json "minAppVersion")
   ...(minAppVersion ? { minVersion: minAppVersion } : {}),
 }
@@ -112,7 +134,10 @@ if (signed) {
   if (!appLinks) console.warn("WARNING: couldn't read the release key with keytool; invite links will open in the browser, not the app")
 }
 
-console.log(`\nRelease ${version} ready in dist/ (APK ${(info.size / 1048576).toFixed(1)} MB)`)
+console.log(
+  `\nRelease ${version} ready in dist/ (APK ${(info.size / 1048576).toFixed(1)} MB; ` +
+    `live update ${(bundleZip.length / 1048576).toFixed(1)} MB for installed apps ${minNative} and newer)`
+)
 if (!signed) {
   console.warn(
     "WARNING: no android/keystore.properties, so this is a DEBUG build. Fine for testing;\n" +

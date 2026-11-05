@@ -1,4 +1,13 @@
 {
+  "2.3.0": {
+    "title": "Updates install themselves",
+    "notes": [
+      "No more downloading and reinstalling: new versions now arrive inside the app (about 1 MB) and start the next time you open it.",
+      "Safe by design: each update is checked before it's used, and if one ever fails to start, the app goes back to the version that worked.",
+      "Settings shows when an update is ready, with Restart now if you can't wait.",
+      "Your data, sign-in and settings stay exactly as they are."
+    ]
+  },
   "2.2.0": {
     "title": "Profiles, and invites that know who you are",
     "notes": [

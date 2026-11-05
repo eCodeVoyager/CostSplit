@@ -58,7 +58,7 @@ import { leaveGroup, requestSync, useSyncState } from "@/lib/sync"
 import { notifyPermission, requestNotifyPermission, showNow, type NotifyPermission } from "@/lib/notify"
 import { setPref, usePrefs } from "@/lib/review"
 import { useTheme, type Theme } from "@/lib/theme"
-import { APP_VERSION, checkForUpdate, useUpdate } from "@/lib/update"
+import { APP_VERSION, applyLiveNow, checkForUpdate, nativeInfo, useLiveUpdate, useUpdate } from "@/lib/update"
 import type { GroupKind, Member } from "@/lib/types"
 import { TRIP_EMOJIS } from "@/lib/categories"
 import { useTripActions } from "@/hooks/useTripActions"
@@ -652,34 +652,60 @@ function NotificationRows() {
 function UpdateRow() {
   const prefs = usePrefs()
   const { state } = useUpdate()
+  const live = useLiveUpdate()
+  const [apk, setApk] = useState<string | null>(null)
+  useEffect(() => {
+    nativeInfo().then((n) => setApk(n?.versionName || null))
+  }, [])
+
+  const status = !isNative
+    ? "The web app updates by itself."
+    : live.status === "ready"
+      ? `${live.version} downloaded. It starts next time you open the app.`
+      : live.status === "downloading"
+        ? `Updating to ${live.version}… ${live.percent}%`
+        : state.status === "ready"
+          ? `${state.info.version} downloaded, ready to install`
+          : state.status === "downloading"
+            ? `Downloading ${state.info.version}… ${state.percent}%`
+            : state.status === "available"
+              ? `${state.info.version} is available`
+              : "Updates install by themselves, no reinstalling."
+
   return (
     <div className="space-y-3 border-t pt-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm">
-          <span className="block font-medium">CostSplit {APP_VERSION}</span>
-          <span className="block text-xs text-muted-foreground">
-            {!isNative
-              ? "The web app updates by itself."
-              : state.status === "ready"
-                ? `${state.info.version} downloaded, ready to install`
-                : state.status === "downloading"
-                  ? `Downloading ${state.info.version}… ${state.percent}%`
-                  : state.status === "available"
-                    ? `${state.info.version} is available`
-                    : "Updates are checked automatically."}
+          <span className="block font-medium">
+            CostSplit {APP_VERSION}
+            {apk && apk !== APP_VERSION && <span className="font-normal text-muted-foreground"> · app {apk}</span>}
           </span>
+          <span className="block text-xs text-muted-foreground">{status}</span>
         </span>
-        {isNative && (
-          <Button variant="outline" size="sm" className="h-9 shrink-0" disabled={state.status === "checking"} onClick={() => checkForUpdate({ manual: true })}>
-            {state.status === "checking" ? "Checking…" : state.status === "ready" || state.status === "available" ? "Update" : "Check for updates"}
-          </Button>
-        )}
+        {isNative &&
+          (live.status === "ready" ? (
+            <Button size="sm" className="h-9 shrink-0" onClick={() => applyLiveNow()}>
+              <RefreshCw /> Restart now
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0"
+              disabled={state.status === "checking" || live.status === "downloading"}
+              onClick={() => checkForUpdate({ manual: true })}
+            >
+              {state.status === "checking" ? "Checking…" : state.status === "ready" || state.status === "available" ? "Update" : "Check for updates"}
+            </Button>
+          ))}
       </div>
       {isNative && (
         <label className="flex items-center gap-3">
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">Download updates automatically</span>
-            <span className="block text-xs text-muted-foreground">New versions download in the background; you tap Install when it suits you.</span>
+            <span className="block text-sm font-medium">Download app updates automatically</span>
+            <span className="block text-xs text-muted-foreground">
+              Most updates arrive by themselves. The rare one that needs a new app download comes in the background; you tap Install when it suits you.
+            </span>
           </span>
           <Switch checked={prefs.autoUpdate} onCheckedChange={(v) => setPref("autoUpdate", v)} aria-label="Download updates automatically" />
         </label>

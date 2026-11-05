@@ -81,7 +81,8 @@ export function UpdateSheet() {
             )}
             <p className="flex items-start gap-2 rounded-xl bg-secondary px-3 py-2 text-xs text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
-              Your homes, expenses and settings stay exactly as they are. Android asks you to confirm the update.
+              Your homes, expenses and settings stay exactly as they are. Android asks you to confirm the update; if Play
+              Protect offers to scan it, tap Scan app. After this one, updates install by themselves.
             </p>
             {state.status === "downloading" && (
               <div aria-live="polite">
