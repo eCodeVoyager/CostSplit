@@ -3,6 +3,19 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 
 const codesFile = path.join(import.meta.dirname, ".data", "codes.json")
+const invitesFile = path.join(import.meta.dirname, ".data", "invites.json")
+
+/** The link in the invite email the test server "sent" to this address */
+export async function invitedLink(address: string) {
+  let link: string | undefined
+  await expect
+    .poll(() => {
+      link = JSON.parse(readFileSync(invitesFile, "utf8"))[address.toLowerCase()]?.link
+      return link
+    })
+    .toBeTruthy()
+  return link!
+}
 
 /** A fresh address per run, so the server's resend throttle never gets in the way */
 export const email = (name: string) => `${name}.${Date.now()}@example.com`

@@ -35,6 +35,12 @@ export interface Member extends Row {
   name: string
   /** Moved out: hidden from new expenses, kept in balances until settled */
   archived?: 0 | 1
+  /** Account that joined as this person; their phones pick this person by themselves */
+  userId?: string
+  /** Invited (or signed-in) email: signing in with it on a new phone also picks this person */
+  email?: string
+  /** Profile photo id of the linked account */
+  avatar?: string
 }
 
 /** meals: weights are the month's meal counts (mess bazar) */

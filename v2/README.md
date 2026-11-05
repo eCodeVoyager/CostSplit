@@ -22,6 +22,7 @@ Shared money for people who live together (3-4 flatmates, a mess, family), with 
 | Uneven splits ("I had less") | **Amounts fill themselves in**: type what some people owe (or paid) and everyone left blank shares the rest equally; the last person absorbs a changed total. Repeat titles offer "Split like last time". |
 | "Did anything change?" | **Updates** (bell): others' new, edited and deleted expenses, payments, items assigned to you, urgent items, plus what needs you now. **Dashboard** on the first screen: what you spent this month across groups, what you owe / get back, bills due, things to buy. |
 | Not forgetting | **Notifications** (Android app, set on the phone so they come with the app closed): bill due days, overdue bills, the buyer's to-buy items on the day they're needed, tonight's meal count, a Friday nudge if you owe. Changes by others that involve you notify when they sync in. |
+| "Who are you?" on every new phone | **Profiles and personal invites**: a profile name and photo (tap your picture on the first screen); the photo shows on you in every group. After adding someone, send them **their own link** (or an email with it): opening it joins as them. Signing in with an invited email, or on a new phone with an account that joined before, also picks the right person. The picker only shows when the app can't tell. |
 | Finding one expense among hundreds | **Filters**: type, people (any one / all of them / only them, paid or shared), your part (I owe, I get back), category, date range, amount range, photo, note, several payers, edited; sort by date or amount; totals and CSV export for what's shown; recently deleted with restore. |
 
 Also: edit anything, undo on delete, several payers ("Rest" fills what's left), split equally / by shares / exact amounts / by meals, live "who owes whom" for any number of people, settle up by fewest payments or direct debts, reminders, multi-currency, CSV export, JSON backup, dark mode.
@@ -156,7 +157,8 @@ bash deploy/deploy.sh s3 costsplit.tapspot.tech
 - `deploy.sh` copies `server/` + `dist/` to `/opt/costsplit`, swaps the release in (the previous one stays as `*.prev`), and installs the nginx site. nginx rolls back if `nginx -t` fails. pm2 then runs `costsplit` on `127.0.0.1:8790`, and the script prints health checks. It's safe to rerun for every release.
 - Data: `/opt/costsplit/data` (one `<groupId>.json` per group + `_auth.json` + `files/`).
 - Cloudflare proxied, SSL mode Full; the origin uses a self-signed cert (`/etc/nginx/ssl/costsplit.*`).
-- Email sign-in: put `RESEND_API_KEY=` and `MAIL_FROM=` in `/opt/costsplit/.env` on the server, then `pm2 restart costsplit`. Until then sign-in answers 503 and the app works offline only.
+- Email sign-in and invite emails: put `RESEND_API_KEY=` and `MAIL_FROM=` in `/opt/costsplit/.env` on the server, then `pm2 restart costsplit`. Until then sign-in answers 503 and the app works offline only. Invite emails link to the address the request came in on; set `PUBLIC_URL=` there to override.
+- Profile photos: `/opt/costsplit/data/avatars/` (one small JPEG per account; replaced photos are deleted).
 
 ### 5. Web app on S3
 
@@ -189,6 +191,8 @@ bash deploy/deploy.sh s3 costsplit.tapspot.tech
 Each row (group, member, expense, payment, bill, meal count, list item) has a client-generated UUID and `updatedAt`. Local edits are marked `dirty`. `POST /api/sync` pushes dirty rows and pulls everything after the device's cursor (a per-trip sequence number). Conflicts resolve last-write-wins per row. Deletes are soft (`deleted: 1`), so they sync and can be undone. Balances are computed on the device, so they're instant and work offline.
 
 Meal counts use one row per person per day, so two phones counting different people never overwrite each other.
+
+People can be tied to accounts: a member row carries `userId`, `email` and `avatar` (profile photo id) once someone joins as them. A personal invite link is `/join/<groupId>?as=<memberId>`; the phone remembers the person until the group has downloaded, then picks them (unless another account already joined as them). Profile name and photo live on the server account (`POST /api/profile`, `PUT|DELETE /api/profile/avatar`, `GET /api/avatars/<id>` for anyone signed in); `POST /api/invite` emails a personal link (group members only, 20 an hour per account).
 
 Personal expenses sync in the same group file but are owner-only: the server stamps each one with the signing-in account, never returns it to anyone else and ignores writes to it from other accounts. Deploy the server before (or with) a client that has the Personal tab: an older server rejects the new `personal` table and that group stops syncing until it's updated.
 

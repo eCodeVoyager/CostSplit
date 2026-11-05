@@ -11,7 +11,7 @@ const MAX_SIDE = 1600
  * Shrinks a camera photo to a ~200 KB JPEG. Re-encoding also drops EXIF data,
  * so the phone's GPS location never leaves the device.
  */
-export async function compressImage(file: Blob): Promise<Blob> {
+export async function compressImage(file: Blob, opts: { square?: number; quality?: number } = {}): Promise<Blob> {
   let source: ImageBitmap | HTMLImageElement
   try {
     source = await createImageBitmap(file, { imageOrientation: "from-image" })
@@ -24,15 +24,23 @@ export async function compressImage(file: Blob): Promise<Blob> {
       img.src = URL.createObjectURL(file)
     })
   }
-  const scale = Math.min(1, MAX_SIDE / Math.max(source.width, source.height))
   const canvas = document.createElement("canvas")
-  canvas.width = Math.round(source.width * scale)
-  canvas.height = Math.round(source.height * scale)
-  canvas.getContext("2d")!.drawImage(source, 0, 0, canvas.width, canvas.height)
+  const ctx = canvas.getContext("2d")!
+  if (opts.square) {
+    // Profile photo: the middle square, scaled down
+    const side = Math.min(source.width, source.height)
+    canvas.width = canvas.height = Math.min(opts.square, side)
+    ctx.drawImage(source, (source.width - side) / 2, (source.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height)
+  } else {
+    const scale = Math.min(1, MAX_SIDE / Math.max(source.width, source.height))
+    canvas.width = Math.round(source.width * scale)
+    canvas.height = Math.round(source.height * scale)
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+  }
   if ("close" in source) source.close()
   else URL.revokeObjectURL(source.src)
   return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't read this photo"))), "image/jpeg", 0.75)
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Couldn't read this photo"))), "image/jpeg", opts.quality ?? 0.75)
   )
 }
 

@@ -36,8 +36,11 @@ else {
     last = url
     setTimeout(() => (last = ""), 3000)
     try {
-      const { pathname } = new URL(url)
-      if (/^\/(join|t)\/[A-Za-z0-9_-]+$/.test(pathname)) navigate(pathname)
+      const { pathname, searchParams } = new URL(url)
+      // ?as=<person> is a personal invite: keep it so the app knows who is joining
+      const as = searchParams.get("as")
+      const query = as && /^[A-Za-z0-9_-]{8,64}$/.test(as) ? `?as=${as}` : ""
+      if (/^\/(join|t)\/[A-Za-z0-9_-]+$/.test(pathname)) navigate(pathname + query)
     } catch {
       // Not a URL we handle
     }

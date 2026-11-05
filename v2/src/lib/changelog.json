@@ -1,4 +1,15 @@
 {
+  "2.2.0": {
+    "title": "Profiles, and invites that know who you are",
+    "notes": [
+      "Your profile: add your name and a photo (tap your picture on the first screen). Your photo shows on you in every home and trip.",
+      "Invite one person at a time: each person gets their own link. Opening it joins as them, no more picking your name from a list.",
+      "Send an invite by email right from the app. Signing in with that address sets them up as the right person.",
+      "New phone? Sign in and the app already knows who you are in each group.",
+      "People in settings show who has joined, who is invited, and their email.",
+      "Made with ☕ by Ehsan."
+    ]
+  },
   "2.1.0": {
     "title": "Personal spending, safer adding, a smarter to-buy list",
     "notes": [

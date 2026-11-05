@@ -70,4 +70,6 @@ export function setKV(key: string, value: unknown) {
 }
 
 export const meKey = (tripId: string) => `me:${tripId}`
+/** Person picked by a personal invite link (/join/<trip>?as=<member>), used once the group is here */
+export const claimKey = (tripId: string) => `claim:${tripId}`
 export const cursorKey = (tripId: string) => `cursor:${tripId}`

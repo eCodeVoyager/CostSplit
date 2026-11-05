@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { STARTER_BILLS, TRIP_EMOJIS } from "@/lib/categories"
 import { CURRENCIES, currencyName } from "@/lib/currencies"
 import { parseAmount } from "@/lib/money"
+import { getSession } from "@/lib/auth"
 import { createTrip } from "@/lib/repo"
 import type { GroupKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -26,7 +27,8 @@ export default function NewTripScreen() {
   const [name, setName] = useState("")
   const [emoji, setEmoji] = useState(DEFAULTS.home.emoji)
   const [currency, setCurrency] = useState(DEFAULTS.home.currency)
-  const [me, setMe] = useState("")
+  // The profile name, when there is one
+  const [me, setMe] = useState(() => getSession()?.user.name ?? "")
   const [friend, setFriend] = useState("")
   const [friends, setFriends] = useState<string[]>([])
   const [bills, setBills] = useState<Set<string>>(new Set(["Rent", "Electricity", "Gas", "Internet"]))
@@ -85,7 +87,7 @@ export default function NewTripScreen() {
     })
     navigate(`/t/${id}`, { replace: true })
     toast.success(kind === "home" ? "Home created" : "Trip created", {
-      description: "Send the others a link so they can join.",
+      description: "Send each person their own link: they join as themselves, no name picking.",
       action: { label: "Invite", onClick: () => navigate(`/t/${id}?invite`) },
     })
   }

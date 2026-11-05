@@ -1,9 +1,9 @@
 import { Bell, ChevronLeft, HandCoins, House, LayoutGrid, Plus, Receipt, Wallet } from "lucide-react"
-import { lazy, Suspense, useEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { Link, Route, Switch, useLocation, useSearch } from "wouter"
 import { AddSheet } from "@/components/AddSheet"
 import { BillSheet } from "@/components/BillSheet"
-import { Splash } from "@/components/common"
+import { AvatarContext, Splash } from "@/components/common"
 import { DetailSheet, type DetailTarget } from "@/components/DetailSheet"
 import { ExpenseSheet, type ExpensePreset } from "@/components/ExpenseSheet"
 import { InboxSheet } from "@/components/InboxSheet"
@@ -14,6 +14,7 @@ import { SyncBadge } from "@/components/SyncBadge"
 import { WhoAreYou } from "@/components/WhoAreYou"
 import { Button } from "@/components/ui/button"
 import { ActionsContext, type TripActions } from "@/hooks/useTripActions"
+import { useIdentity } from "@/hooks/useIdentity"
 import { useInbox } from "@/hooks/useInbox"
 import { TripContext, useTrip, useTripQuery, type BillStatus } from "@/hooks/useTripData"
 import { toISODate } from "@/lib/dates"
@@ -50,8 +51,16 @@ export function TripShell({ id }: { id: string }) {
   const [sheet, setSheet] = useState<Sheet | null>(null)
   // Keep each sheet's last props while it animates closed
   const [last, setLast] = useState<Partial<Record<Sheet["kind"], Sheet>>>({})
-  const [shareOpen, setShareOpen] = useState(false)
+  // Invite dialog: everyone (memberId null) or one person
+  const [share, setShare] = useState<{ memberId: string | null } | null>(null)
   const [whoOpen, setWhoOpen] = useState(false)
+  // Joined with a personal link, on another phone, or invited by email: no "Who are you?"
+  const autoMe = useIdentity(data, () => setWhoOpen(true))
+  const everyone = data?.everyone
+  const avatars = useMemo(
+    () => new Map((everyone ?? []).filter((m) => m.avatar).map((m) => [m.id, m.avatar!])),
+    [everyone]
+  )
 
   useEffect(() => {
     if (data) rememberTrip(id)
@@ -99,7 +108,8 @@ export function TripShell({ id }: { id: string }) {
     recordPayment: (suggestion) => open({ kind: "payment", suggestion: suggestion ?? null }),
     payBill,
     editBill: (bill) => open({ kind: "bill", bill: bill ?? null }),
-    invite: () => setShareOpen(true),
+    invite: () => setShare({ memberId: null }),
+    inviteMember: (memberId) => setShare({ memberId }),
     changeMe: () => setWhoOpen(true),
   }
 
@@ -112,6 +122,7 @@ export function TripShell({ id }: { id: string }) {
 
   return (
     <TripContext.Provider value={data}>
+      <AvatarContext.Provider value={avatars}>
       <ActionsContext.Provider value={actions}>
         <div className="min-h-dvh pb-[calc(6rem+var(--sab))]">
           <header className="pt-safe sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
@@ -165,18 +176,24 @@ export function TripShell({ id }: { id: string }) {
         <DetailSheet open={sheet?.kind === "detail"} onOpenChange={onOpenChange} target={detail?.target} />
         <PersonalSheet open={sheet?.kind === "personal"} onOpenChange={onOpenChange} item={personal?.item} preset={personal?.preset} />
         <MemberSheet open={sheet?.kind === "member"} onOpenChange={onOpenChange} memberId={member?.memberId} />
-        {shareOpen && (
+        {share && (
           <Suspense>
-            <ShareDialog trip={data.trip} open={shareOpen} onOpenChange={setShareOpen} />
+            <ShareDialog
+              trip={data.trip}
+              open
+              onOpenChange={(o) => !o && setShare(null)}
+              initialMember={share.memberId}
+            />
           </Suspense>
         )}
         <WhoAreYou
           tripId={data.trip.id}
           members={data.members}
-          open={whoOpen || (!data.meId && data.members.length > 0)}
+          open={whoOpen || (!data.meId && !autoMe && data.members.length > 0)}
           onOpenChange={data.meId ? setWhoOpen : undefined}
         />
       </ActionsContext.Provider>
+      </AvatarContext.Provider>
     </TripContext.Provider>
   )
 }

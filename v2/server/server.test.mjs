@@ -15,6 +15,7 @@ let server
 let base
 let dataDir
 const inbox = new Map()
+const invites = []
 
 async function call(pathname, { method = "POST", body, token } = {}) {
   const res = await fetch(`${base}${pathname}`, {
@@ -38,7 +39,12 @@ const sync = (body, token = alice) => call("/api/sync", { body, token })
 describe("sync server", () => {
   before(async () => {
     dataDir = await mkdtemp(path.join(tmpdir(), "costsplit-"))
-    server = createServer({ dataDir, mailer: async (email, code) => inbox.set(email, code) })
+    server = createServer({
+      dataDir,
+      mailer: async (email, code) => inbox.set(email, code),
+      inviter: async (invite) => invites.push(invite),
+      publicUrl: "https://split.example.com/",
+    })
     await new Promise((r) => server.listen(0, "127.0.0.1", r))
     base = `http://127.0.0.1:${server.address().port}`
     alice = await signIn("Alice@Example.com")
@@ -229,6 +235,71 @@ describe("sync server", () => {
       site.close()
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it("keeps a profile name and photo, shown to anyone signed in", async () => {
+    const named = await call("/api/profile", { body: { name: `  Alice${String.fromCharCode(7)} A.  ` }, token: alice })
+    assert.equal(named.status, 200)
+    assert.equal(named.body.user.name, "Alice A.")
+    assert.equal((await call("/api/profile", { body: { name: 42 }, token: alice })).status, 400)
+    assert.equal((await call("/api/profile", { body: { name: "x" } })).status, 401)
+
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9, 9])
+    const upload = (body, type = "image/jpeg") =>
+      fetch(`${base}/api/profile/avatar`, { method: "PUT", headers: { "Content-Type": type, Authorization: `Bearer ${alice}` }, body })
+    assert.equal((await upload(Buffer.from("png?"))).status, 415)
+    assert.equal((await upload(Buffer.alloc(600 * 1024, 0xff))).status, 413)
+    const first = await (await upload(jpeg)).json()
+    assert.match(first.user.avatar, /^[\w-]{8,64}$/)
+    const second = await (await upload(jpeg)).json()
+    assert.notEqual(second.user.avatar, first.user.avatar, "a new photo gets a new id")
+
+    // /api/me and sign-in both carry the profile
+    const me = await call("/api/me", { method: "GET", token: alice })
+    assert.equal(me.body.user.name, "Alice A.")
+    assert.equal(me.body.user.avatar, second.user.avatar)
+
+    const other = await signIn("frank@example.com")
+    const photo = await fetch(`${base}/api/avatars/${second.user.avatar}`, { headers: { Authorization: `Bearer ${other}` } })
+    assert.equal(photo.status, 200)
+    assert.deepEqual(Buffer.from(await photo.arrayBuffer()), jpeg)
+    // The replaced photo is gone, and photos need an account
+    assert.equal((await fetch(`${base}/api/avatars/${first.user.avatar}`, { headers: { Authorization: `Bearer ${other}` } })).status, 404)
+    assert.equal((await fetch(`${base}/api/avatars/${second.user.avatar}`)).status, 401)
+
+    const removed = await call("/api/profile/avatar", { method: "DELETE", token: alice })
+    assert.equal(removed.body.user.avatar, undefined)
+    assert.equal((await fetch(`${base}/api/avatars/${second.user.avatar}`, { headers: { Authorization: `Bearer ${other}` } })).status, 404)
+  })
+
+  it("emails personal invite links for members of the group only", async () => {
+    await sync({ tripId: TRIP, changes: [{ table: "members", record: member("member-carol", { name: "Carol <b>", updatedAt: 6000 }) }] })
+    const invite = (body, token = alice) => call("/api/invite", { body: { tripId: TRIP, memberId: "member-carol", email: "Carol@Example.com", ...body }, token })
+
+    const sent = await invite({})
+    assert.equal(sent.status, 200)
+    const last = invites.at(-1)
+    assert.equal(last.email, "carol@example.com")
+    assert.equal(last.inviter, "Alice A.")
+    assert.equal(last.member, "Carol <b>")
+    assert.equal(last.link, `https://split.example.com/join/${TRIP}?as=member-carol`)
+
+    assert.equal((await invite({ email: "nope" })).status, 400)
+    assert.equal((await invite({ memberId: "member-nobody" })).status, 404)
+    assert.equal((await invite({ tripId: OTHER })).status, 403)
+    // Signed in but not in the group
+    const mallory = await signIn("mallory@example.com")
+    assert.equal((await invite({}, mallory)).status, 403)
+    assert.equal(invites.length, 1)
+  })
+
+  it("escapes names in invite emails", async () => {
+    const { inviteMessage } = await import("./auth.mjs")
+    const msg = inviteMessage({ email: "c@x.io", inviter: "A", member: "<script>", group: "G&G", emoji: "🏠", kind: "home", link: "https://x.io/join/abc?as=d" })
+    assert.ok(!msg.html.includes("<script>"))
+    assert.ok(msg.html.includes("&lt;script&gt;"))
+    assert.ok(msg.html.includes("G&amp;G"))
+    assert.ok(msg.text.includes("https://x.io/join/abc?as=d"))
   })
 
   it("answers CORS preflight (with Authorization) and health", async () => {

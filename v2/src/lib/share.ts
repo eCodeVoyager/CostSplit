@@ -12,6 +12,11 @@ export function tripLink(tripId: string) {
   return `${publicOrigin()}/join/${tripId}`
 }
 
+/** A link for one person: opening it joins as them, without "Who are you?" */
+export function memberLink(tripId: string, memberId: string) {
+  return `${tripLink(tripId)}?as=${encodeURIComponent(memberId)}`
+}
+
 /** Native share sheet when available (WhatsApp, Telegram...), clipboard otherwise */
 export async function shareOrCopy(data: { title?: string; text: string; url?: string }): Promise<"shared" | "copied" | "cancelled"> {
   // The Android WebView has no navigator.share; the Share plugin opens the system sheet

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import { authHeaders, fetchMyGroups, getSession, onSessionChange, sessionExpired } from "./auth"
+import { authHeaders, fetchMyGroups, getSession, onSessionChange, refreshProfile, sessionExpired } from "./auth"
 import { allRowTables, CHILD_TABLES, cursorKey, db, getKV, SYNC_TABLES, table } from "./db"
 import { apiUrl, hasServer } from "./server"
 import type { AnyRow, TableName } from "./types"
@@ -279,4 +279,6 @@ export function startSync() {
   }, 30_000)
   onSessionChange(() => requestSync(0))
   requestSync(0)
+  // Name and photo may have been changed on another phone
+  if (canSync()) refreshProfile()
 }

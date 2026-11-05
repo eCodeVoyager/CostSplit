@@ -22,6 +22,8 @@ export interface TripActions {
   payBill: (status: BillStatus) => void
   editBill: (bill?: Bill) => void
   invite: () => void
+  /** Personal invite for one person: their own link (and an email), so they never pick a name */
+  inviteMember: (memberId: string) => void
   changeMe: () => void
 }
 

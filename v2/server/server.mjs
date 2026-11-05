@@ -6,14 +6,16 @@
 //
 // Env: PORT, HOST, DATA_DIR, STATIC_DIR (built web app; empty string = API only),
 //      TRUST_PROXY=1 when behind nginx/Caddy/a load balancer (rate limit by X-Forwarded-For),
-//      RESEND_API_KEY + MAIL_FROM for sign-in emails (without a key, dev prints codes to the console)
+//      RESEND_API_KEY + MAIL_FROM for sign-in and invite emails (without a key, dev prints them to the console),
+//      PUBLIC_URL for links in invite emails (default: the address the request came in on)
 
 import { createReadStream } from "node:fs"
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises"
+import { randomUUID } from "node:crypto"
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
 import http from "node:http"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { consoleMailer, createAuth, resendMailer } from "./auth.mjs"
+import { consoleInviter, consoleMailer, createAuth, normalizeEmail, resendInviter, resendMailer } from "./auth.mjs"
 import { HttpError } from "./http-error.mjs"
 
 const TABLES = new Set(["trips", "members", "expenses", "payments", "bills", "meals", "items", "personal"])
@@ -23,12 +25,17 @@ const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
 const MAX_BODY = 1024 * 1024
 // Photos are resized to ~1600px JPEG on the phone, so this is generous
 const MAX_FILE_BYTES = 3 * 1024 * 1024
+// Profile photos are cropped to a small square on the phone
+const MAX_AVATAR_BYTES = 512 * 1024
 const MAX_CHANGES = 500
 const MAX_RECORD_BYTES = 8 * 1024
 const MAX_RECORDS_PER_TRIP = 50_000
 const PAGE_SIZE = 500
 const SYNC_LIMIT = { windowMs: 5 * 60 * 1000, max: 600 }
 const AUTH_LIMIT = { windowMs: 10 * 60 * 1000, max: 30 }
+// Invite emails per account, so nobody can use the server to send mail in bulk
+const INVITE_LIMIT = { windowMs: 60 * 60 * 1000, max: 20 }
+const JPEG = (bytes) => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -145,6 +152,12 @@ function createStore(dataDir) {
     return (await load(tripId)).users?.includes(userId) ?? false
   }
 
+  /** A person in the group (not removed), for invite emails */
+  async function member(tripId, memberId) {
+    const data = (await load(tripId)).records[`members:${memberId}`]?.data
+    return data && !data.deleted ? data : null
+  }
+
   async function leave(tripId, userId) {
     return withLock(tripId, async () => {
       const trip = await load(tripId)
@@ -154,7 +167,7 @@ function createStore(dataDir) {
     })
   }
 
-  return { sync, info, leave, isMember }
+  return { sync, info, leave, isMember, member }
 }
 
 function validate(body) {
@@ -205,12 +218,12 @@ function readBytes(req, limit) {
     const chunks = []
     req.on("data", (chunk) => {
       size += chunk.length
-      if (size > limit) {
-        reject(new HttpError(413, "Photo too large"))
-        req.destroy()
-      } else chunks.push(chunk)
+      if (size <= limit) chunks.push(chunk)
+      // Far too big: stop listening. Slightly too big: read to the end so the phone gets a clear 413.
+      else if (size > limit * 4) req.destroy()
     })
-    req.on("end", () => resolve(Buffer.concat(chunks)))
+    req.on("end", () => (size > limit ? reject(new HttpError(413, "Photo too large")) : resolve(Buffer.concat(chunks))))
+    req.on("close", () => size > limit && reject(new HttpError(413, "Photo too large")))
     req.on("error", reject)
   })
 }
@@ -267,21 +280,36 @@ async function serveStatic(staticDir, urlPath, req, res) {
   createReadStream(filePath).pipe(res)
 }
 
-export function createServer({ dataDir, staticDir, trustProxy = false, mailer = consoleMailer } = {}) {
+export function createServer({
+  dataDir,
+  staticDir,
+  trustProxy = false,
+  mailer = consoleMailer,
+  inviter = consoleInviter,
+  publicUrl = "",
+} = {}) {
   const dir = path.resolve(dataDir ?? "data")
   const store = createStore(dir)
   const auth = createAuth({ dataDir: dir, mailer })
   const allowSync = rateLimiter(SYNC_LIMIT)
   const allowAuth = rateLimiter(AUTH_LIMIT)
+  const allowInvite = rateLimiter(INVITE_LIMIT)
   const root = staticDir ? path.resolve(staticDir) : null
+  const avatarDir = path.join(dir, "avatars")
   const clientIp = (req) =>
     (trustProxy && String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim()) || req.socket.remoteAddress
+  // Where invite links point: PUBLIC_URL, or the address this request came in on
+  const origin = (req) => {
+    if (publicUrl) return publicUrl.replace(/\/+$/, "")
+    const proto = trustProxy ? String(req.headers["x-forwarded-proto"] ?? "http").split(",")[0].trim() : "http"
+    return `${proto === "https" ? "https" : "http"}://${req.headers.host ?? "localhost"}`
+  }
 
   return http.createServer(async (req, res) => {
     // The trip id is the access key (no cookies), so any origin may call the API.
     // This also lets the Android app (https://localhost) reach the server.
     res.setHeader("Access-Control-Allow-Origin", "*")
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
     res.setHeader("X-Content-Type-Options", "nosniff")
     // Trip ids in URLs are access keys: never leak them to other sites
@@ -342,9 +370,7 @@ export function createServer({ dataDir, staticDir, trustProxy = false, mailer = 
             if (!String(req.headers["content-type"]).startsWith("image/jpeg")) throw new HttpError(415, "Send a JPEG photo")
             const bytes = await readBytes(req, MAX_FILE_BYTES)
             // JPEG files start with FF D8 FF
-            if (bytes.length < 3 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
-              throw new HttpError(415, "Send a JPEG photo")
-            }
+            if (!JPEG(bytes)) throw new HttpError(415, "Send a JPEG photo")
             await mkdir(fileDir, { recursive: true })
             const tmp = `${filePath}.${process.pid}.tmp`
             await writeFile(tmp, bytes)
@@ -362,6 +388,65 @@ export function createServer({ dataDir, staticDir, trustProxy = false, mailer = 
             })
             return createReadStream(filePath).pipe(res)
           }
+        }
+        // Profile: a display name and a photo, shown on this account's people in every group
+        if (pathname === "/api/profile" && req.method === "POST") {
+          const { name } = await readJson(req)
+          return json(200, { user: await auth.setName(user.id, name) })
+        }
+        if (pathname === "/api/profile/avatar" && (req.method === "PUT" || req.method === "DELETE")) {
+          let next = null
+          if (req.method === "PUT") {
+            if (!allowSync(clientIp(req))) throw new HttpError(429, "Too many requests, slow down")
+            if (!String(req.headers["content-type"]).startsWith("image/jpeg")) throw new HttpError(415, "Send a JPEG photo")
+            const bytes = await readBytes(req, MAX_AVATAR_BYTES)
+            if (!JPEG(bytes)) throw new HttpError(415, "Send a JPEG photo")
+            // A new id per photo, so phones that cached the old one never show it again
+            next = randomUUID()
+            await mkdir(avatarDir, { recursive: true })
+            const tmp = path.join(avatarDir, `${next}.jpg.${process.pid}.tmp`)
+            await writeFile(tmp, bytes)
+            await rename(tmp, path.join(avatarDir, `${next}.jpg`))
+          }
+          const { user: updated, previous } = await auth.setAvatar(user.id, next)
+          if (previous) await unlink(path.join(avatarDir, `${previous}.jpg`)).catch(() => {})
+          return json(200, { user: updated })
+        }
+        // Anyone signed in may see a profile photo: the id is random and only shared inside groups
+        const avatarMatch = pathname.match(/^\/api\/avatars\/([A-Za-z0-9_-]{8,64})$/)
+        if (avatarMatch && req.method === "GET") {
+          const filePath = path.join(avatarDir, `${avatarMatch[1]}.jpg`)
+          const info = await stat(filePath).catch(() => null)
+          if (!info) throw new HttpError(404, "Photo not found")
+          res.writeHead(200, {
+            "Content-Type": "image/jpeg",
+            "Content-Length": info.size,
+            "Cache-Control": "private, max-age=31536000, immutable",
+          })
+          return createReadStream(filePath).pipe(res)
+        }
+        // Email someone their personal invite link: opening it joins as that person, no "Who are you?"
+        if (pathname === "/api/invite" && req.method === "POST") {
+          if (!allowInvite(user.id)) throw new HttpError(429, "That's a lot of invites. Try again in an hour.")
+          const body = await readJson(req)
+          const { tripId, memberId } = body
+          if (typeof tripId !== "string" || !ID_RE.test(tripId)) throw new HttpError(400, "Invalid trip id")
+          if (typeof memberId !== "string" || !ID_RE.test(memberId)) throw new HttpError(400, "Invalid person")
+          const email = normalizeEmail(body.email)
+          if (!(await store.isMember(tripId, user.id))) throw new HttpError(403, "Not a member of this group")
+          const [group, person] = await Promise.all([store.info(tripId), store.member(tripId, memberId)])
+          // The person must already be synced to the server (sync first, then invite)
+          if (!group || !person) throw new HttpError(404, "Sync this group first, then send the invite")
+          await inviter({
+            email,
+            inviter: user.name || user.email,
+            member: String(person.name ?? "there").slice(0, 40),
+            group: String(group.name ?? "CostSplit").slice(0, 60),
+            emoji: String(group.emoji ?? "").slice(0, 8),
+            kind: group.kind,
+            link: `${origin(req)}/join/${tripId}?as=${encodeURIComponent(memberId)}`,
+          })
+          return json(200, { ok: true })
         }
         if (pathname === "/api/groups/leave" && req.method === "POST") {
           const { tripId } = await readJson(req)
@@ -390,13 +475,15 @@ if (entry && fileURLToPath(import.meta.url) === path.resolve(entry)) {
   const port = Number(process.env.PORT ?? 8787)
   const dataDir = process.env.DATA_DIR ?? path.join(here, "..", "data")
   const staticDir = process.env.STATIC_DIR ?? path.join(here, "..", "dist")
-  const mailer = process.env.RESEND_API_KEY
-    ? resendMailer({ apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM ?? "CostSplit <onboarding@resend.dev>" })
-    : process.env.NODE_ENV === "production"
-      ? async () => {
-          throw new HttpError(503, "Email sign-in isn't set up on this server yet")
-        }
-      : consoleMailer
+  const resend = process.env.RESEND_API_KEY
+    ? { apiKey: process.env.RESEND_API_KEY, from: process.env.MAIL_FROM ?? "CostSplit <onboarding@resend.dev>" }
+    : null
+  const noEmail = (what) => async () => {
+    throw new HttpError(503, `${what} isn't set up on this server yet`)
+  }
+  const production = process.env.NODE_ENV === "production"
+  const mailer = resend ? resendMailer(resend) : production ? noEmail("Email sign-in") : consoleMailer
+  const inviter = resend ? resendInviter(resend) : production ? noEmail("Email invites") : consoleInviter
   if (!process.env.RESEND_API_KEY) {
     console.warn(
       process.env.NODE_ENV === "production"
@@ -404,7 +491,14 @@ if (entry && fileURLToPath(import.meta.url) === path.resolve(entry)) {
         : "RESEND_API_KEY not set: sign-in codes are printed here instead of emailed"
     )
   }
-  const server = createServer({ dataDir, staticDir, trustProxy: process.env.TRUST_PROXY === "1", mailer })
+  const server = createServer({
+    dataDir,
+    staticDir,
+    trustProxy: process.env.TRUST_PROXY === "1",
+    mailer,
+    inviter,
+    publicUrl: process.env.PUBLIC_URL ?? "",
+  })
   server.listen(port, process.env.HOST ?? "0.0.0.0", () => {
     console.log(`CostSplit server on http://localhost:${port} (data: ${path.resolve(dataDir)})`)
   })

@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import { createContext, useContext, type ReactNode } from "react"
+import { useAvatarUrl } from "@/lib/avatars"
 import { getCategory } from "@/lib/categories"
 import { formatMoney } from "@/lib/money"
 import { cn } from "@/lib/utils"
@@ -26,18 +27,32 @@ export function initials(name: string) {
   return letters.toUpperCase()
 }
 
-export function MemberAvatar({ id, name, className }: { id: string; name: string; className?: string }) {
+/** memberId -> profile photo id, for everyone in the open group */
+export const AvatarContext = createContext<ReadonlyMap<string, string>>(new Map())
+
+/** Profile photo when the person joined with an account that has one, colored initials otherwise */
+export function MemberAvatar({ id, name, className, photo }: { id: string; name: string; className?: string; photo?: string | null }) {
+  const fromGroup = useContext(AvatarContext).get(id)
+  const url = useAvatarUrl(photo === undefined ? fromGroup : photo)
+  const base = "inline-flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold select-none"
+  if (url) return <img src={url} alt="" aria-hidden className={cn(base, "bg-muted object-cover", className)} draggable={false} />
   return (
-    <span
-      aria-hidden
-      className={cn(
-        "avatar inline-flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold select-none",
-        className
-      )}
-      style={{ ["--h" as string]: hueFor(id) }}
-    >
+    <span aria-hidden className={cn("avatar", base, className)} style={{ ["--h" as string]: hueFor(id) }}>
       {initials(name)}
     </span>
+  )
+}
+
+/** The small credit line */
+export function MadeBy({ className }: { className?: string }) {
+  return (
+    <p className={cn("text-center text-xs text-muted-foreground", className)}>
+      Made with{" "}
+      <span role="img" aria-label="coffee">
+        ☕
+      </span>{" "}
+      by Ehsan
+    </p>
   )
 }
 

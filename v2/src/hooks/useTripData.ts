@@ -9,7 +9,7 @@ import {
   type Transfer,
 } from "@/lib/balance"
 import { shiftMonth, toISODate } from "@/lib/dates"
-import { db, getKV, meKey } from "@/lib/db"
+import { claimKey, db, getKV, meKey } from "@/lib/db"
 import type { Bill, Expense, GroupKind, Meal, Member, Payment, PersonalExpense, ShopItem, Trip } from "@/lib/types"
 
 export interface BillStatus {
@@ -49,6 +49,8 @@ export interface TripData {
   deletedExpenses: Expense[]
   deletedPayments: Payment[]
   meId: string | null
+  /** Person a personal invite link was for, until this phone knows who "me" is */
+  claim: string | null
   balances: MemberBalance[]
   transfers: Transfer[]
   /** Unsynced local changes */
@@ -87,7 +89,7 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
   const raw = useLiveQuery(async () => {
     const trip = await db.trips.get(tripId)
     if (!trip) return null
-    const [members, expenses, payments, bills, meals, items, personal, meId] = await Promise.all([
+    const [members, expenses, payments, bills, meals, items, personal, meId, claim] = await Promise.all([
       db.members.where("tripId").equals(tripId).toArray(),
       db.expenses.where("tripId").equals(tripId).toArray(),
       db.payments.where("tripId").equals(tripId).toArray(),
@@ -96,13 +98,14 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
       db.items.where("tripId").equals(tripId).toArray(),
       db.personal.where("tripId").equals(tripId).toArray(),
       getKV<string | null>(meKey(tripId), null),
+      getKV<string | null>(claimKey(tripId), null),
     ])
-    return { trip, members, expenses, payments, bills, meals, items, personal, meId }
+    return { trip, members, expenses, payments, bills, meals, items, personal, meId, claim }
   }, [tripId])
 
   return useMemo(() => {
     if (raw === undefined || raw === null) return raw
-    const { trip, members, expenses, payments, bills, meals, items, personal, meId } = raw
+    const { trip, members, expenses, payments, bills, meals, items, personal, meId, claim } = raw
     const everyone = members.filter((m) => !m.deleted).sort(byCreated)
     const active = everyone.filter((m) => !m.archived)
     const liveExpenses = expenses.filter((e) => !e.deleted).sort(newestFirst)
@@ -138,6 +141,7 @@ export function useTripQuery(tripId: string): TripData | null | undefined {
       deletedExpenses: expenses.filter((e) => e.deleted).sort(recentlyChanged),
       deletedPayments: payments.filter((p) => p.deleted).sort(recentlyChanged),
       meId: meId && active.some((m) => m.id === meId) ? meId : null,
+      claim,
       balances,
       transfers: suggestTransfers(balances),
       pending,

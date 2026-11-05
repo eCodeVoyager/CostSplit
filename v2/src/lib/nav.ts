@@ -22,3 +22,11 @@ export function parseInvite(input: string): string | null {
   const id = match ? match[1] : text
   return isTripId(id) ? id : null
 }
+
+/** Where a pasted invite should go, keeping a personal invite's ?as=<person> */
+export function invitePath(input: string): string | null {
+  const id = parseInvite(input)
+  if (!id) return null
+  const as = input.match(/[?&]as=([A-Za-z0-9_-]{8,64})/)?.[1]
+  return `/join/${id}${as ? `?as=${as}` : ""}`
+}

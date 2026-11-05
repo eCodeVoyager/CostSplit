@@ -10,6 +10,7 @@ import { JoinScreen } from "@/screens/JoinScreen"
 import { TripShell } from "@/screens/TripShell"
 
 const NewTripScreen = lazy(() => import("@/screens/NewTripScreen"))
+const ProfileScreen = lazy(() => import("@/screens/ProfileScreen"))
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Switch>
           <Route path="/" component={HomeScreen} />
           <Route path="/new" component={NewTripScreen} />
+          <Route path="/profile" component={ProfileScreen} />
           <Route path="/join/:id">{(p) => <JoinScreen id={p.id} />}</Route>
           <Route path="/t/:id" nest>
             {(p) => <TripShell key={p.id} id={p.id} />}

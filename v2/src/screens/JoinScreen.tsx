@@ -1,11 +1,12 @@
 import { CircleAlert, UserRound, WifiOff } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import { useLocation } from "wouter"
+import { useLocation, useSearch } from "wouter"
 import { EmptyState, Splash } from "@/components/common"
 import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { useOnline } from "@/hooks/useInstall"
 import { useSession } from "@/lib/auth"
+import { claimKey, setKV } from "@/lib/db"
 import { isTripId } from "@/lib/nav"
 import { joinTrip, SignedOutError, TripNotFoundError } from "@/lib/sync"
 
@@ -22,9 +23,12 @@ export function JoinScreen({ id, embedded }: { id: string; embedded?: boolean })
   const online = useOnline()
   const session = useSession()
   const [state, setState] = useState<State>("joining")
+  // Personal invite (/join/<group>?as=<person>): remembered, then used once the group is here
+  const as = new URLSearchParams(useSearch()).get("as")
 
   const run = useCallback(async () => {
     if (!isTripId(id)) return setState("notfound")
+    if (as && isTripId(as)) await setKV(claimKey(id), as)
     if (!navigator.onLine) return setState("offline")
     setState("joining")
     try {
@@ -36,7 +40,7 @@ export function JoinScreen({ id, embedded }: { id: string; embedded?: boolean })
         openSignIn(JOIN_REASON)
       } else setState(err instanceof TripNotFoundError ? "notfound" : "error")
     }
-  }, [id, embedded, navigate])
+  }, [id, as, embedded, navigate])
 
   // Runs again right after signing in
   useEffect(() => {

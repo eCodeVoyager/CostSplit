@@ -1,4 +1,6 @@
-import { allRowTables, CHILD_TABLES, cursorKey, db, meKey, setKV, table } from "./db"
+import type { User } from "./auth"
+import { allRowTables, CHILD_TABLES, claimKey, cursorKey, db, meKey, setKV, table } from "./db"
+import { linkChanges } from "./people"
 import { requestSync } from "./sync"
 import type { AnyRow, Bill, Expense, GroupKind, Meal, Member, Payment, PersonalExpense, Row, ShopItem, TableName, Trip } from "./types"
 
@@ -104,6 +106,23 @@ export const setMemberArchived = (id: string, archived: boolean) =>
   patchRow("members", id, { archived: archived ? 1 : 0 })
 
 export const setMe = (tripId: string, memberId: string) => setKV(meKey(tripId), memberId)
+
+/**
+ * Ties `meId` to the signed-in account (people.ts linkChanges), from what's in
+ * the database right now, so running it twice never writes twice.
+ */
+export async function linkMe(tripId: string, meId: string, user: User, force = false) {
+  const members = (await db.members.where("tripId").equals(tripId).toArray()).filter((m) => !m.deleted)
+  const changes = linkChanges(members, meId, user, force)
+  for (const { id, patch } of changes) await patchRow("members", id, patch)
+  return changes.length
+}
+
+/** The address a personal invite went to; signing in with it picks this person */
+export const setMemberEmail = (id: string, email: string | null) =>
+  patchRow("members", id, { email: email?.trim().toLowerCase() || undefined })
+
+export const clearClaim = (tripId: string) => db.kv.delete(claimKey(tripId))
 
 export type ExpenseInput = Omit<Expense, keyof Row | "createdBy" | "updatedBy">
 
@@ -227,7 +246,7 @@ export async function removeTripLocally(tripId: string) {
     await db.trips.delete(tripId)
     for (const name of CHILD_TABLES) await table(name).where("tripId").equals(tripId).delete()
     await db.files.where("tripId").equals(tripId).delete()
-    await db.kv.bulkDelete([meKey(tripId), cursorKey(tripId)])
+    await db.kv.bulkDelete([meKey(tripId), cursorKey(tripId), claimKey(tripId)])
   })
 }
 

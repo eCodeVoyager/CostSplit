@@ -1,7 +1,7 @@
 import { Bell, ChevronRight, CloudOff, HandCoins, Link2, ListChecks, Plus, Share, Siren, Smartphone, UserRound, UtensilsCrossed, WifiOff, Zap, type LucideIcon } from "lucide-react"
 import { useState } from "react"
 import { useLocation } from "wouter"
-import { BalanceText } from "@/components/common"
+import { BalanceText, MadeBy, MemberAvatar } from "@/components/common"
 import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input"
 import { useBackClose } from "@/hooks/useBackClose"
 import { useInstall } from "@/hooks/useInstall"
 import { useAllGroups, type GroupSummary } from "@/hooks/useAllGroups"
-import { useSession } from "@/lib/auth"
+import { displayName, useSession } from "@/lib/auth"
 import { monthLabel, shortDate, toISODate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
-import { parseInvite } from "@/lib/nav"
+import { invitePath } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 import { hasServer, isAndroidBrowser, publicOrigin } from "@/lib/server"
 
@@ -30,10 +30,26 @@ export function HomeScreen() {
     <div className="pt-safe mx-auto min-h-dvh max-w-lg px-4 pb-10">
       <header className="flex items-center gap-3 py-5">
         <img src="/favicon.svg" alt="" className="size-10 rounded-xl" />
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">CostSplit</h1>
           <p className="text-xs text-muted-foreground">Shared home & trip costs. Works offline.</p>
         </div>
+        {hasServer() && (
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="-mr-1 inline-flex size-12 shrink-0 items-center justify-center rounded-full active:scale-95"
+            aria-label={session ? `Profile: ${displayName(session.user)}` : "Profile and sign in"}
+          >
+            {session ? (
+              <MemberAvatar id={session.user.id} name={displayName(session.user)} photo={session.user.avatar ?? null} className="size-10" />
+            ) : (
+              <span className="inline-flex size-10 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <UserRound className="size-5" aria-hidden />
+              </span>
+            )}
+          </button>
+        )}
       </header>
 
       {trips.length === 0 ? (
@@ -93,7 +109,8 @@ export function HomeScreen() {
         </>
       )}
 
-      <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} onJoin={(id) => navigate(`/join/${id}`)} />
+      <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} onJoin={(path) => navigate(path)} />
+      <MadeBy className="mt-10" />
     </div>
   )
 }
@@ -195,20 +212,21 @@ function JoinDialog({
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
-  onJoin: (id: string) => void
+  /** /join/<group>, with ?as=<person> for a personal invite */
+  onJoin: (path: string) => void
 }) {
   const [value, setValue] = useState("")
   const [error, setError] = useState("")
   useBackClose(open, () => onOpenChange(false))
 
   const submit = () => {
-    const id = parseInvite(value)
-    if (!id) {
+    const path = invitePath(value)
+    if (!path) {
       setError("That doesn't look like a CostSplit link")
       return
     }
     onOpenChange(false)
-    onJoin(id)
+    onJoin(path)
   }
 
   const paste = async () => {

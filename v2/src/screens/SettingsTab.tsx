@@ -3,9 +3,9 @@ import {
   Download,
   FileJson,
   FileSpreadsheet,
-  LogOut,
   Pencil,
   RefreshCw,
+  Send,
   Smartphone,
   Trash2,
   Upload,
@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { UNDO_MS } from "@/lib/utils"
 import { useLocation } from "wouter"
-import { MemberAvatar, SectionTitle, Segmented } from "@/components/common"
+import { MadeBy, MemberAvatar, SectionTitle, Segmented } from "@/components/common"
 import { openSignIn } from "@/components/SignInSheet"
 import {
   AlertDialog,
@@ -37,7 +37,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useInstall, useOnline } from "@/hooks/useInstall"
 import { useTrip } from "@/hooks/useTripData"
-import { endSession, useSession } from "@/lib/auth"
+import { displayName, useSession } from "@/lib/auth"
 import { CURRENCIES, currencyName, fetchRate } from "@/lib/currencies"
 import { timeAgo } from "@/lib/dates"
 import { rememberTrip } from "@/lib/nav"
@@ -66,7 +66,7 @@ import { useTripActions } from "@/hooks/useTripActions"
 export default function SettingsTab() {
   const { trip, kind, members, everyone, meId, expenses, mealWeights } = useTrip()
   const label = kind === "home" ? "home" : "trip"
-  const { invite, changeMe } = useTripActions()
+  const { invite, inviteMember, changeMe } = useTripActions()
   const [theme, setTheme] = useTheme()
   const prefs = usePrefs()
   const [, navigate] = useLocation()
@@ -89,8 +89,13 @@ export default function SettingsTab() {
       toast.error(`${trimmed} is already here`)
       return
     }
-    await addMember(trip.id, trimmed.slice(0, 40))
+    const id = await addMember(trip.id, trimmed.slice(0, 40))
     setNewPerson("")
+    // Their own link joins as them, so they never have to pick their name
+    toast.success(`${trimmed} added`, {
+      description: "Send them a personal invite: it joins as them straight away.",
+      action: { label: "Invite", onClick: () => inviteMember(id) },
+    })
   }
 
   const saveFailed = (err: unknown) =>
@@ -197,7 +202,7 @@ export default function SettingsTab() {
       </SectionTitle>
       <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
         {everyone.map((m) => (
-          <PersonRow key={m.id} member={m} isMe={m.id === meId} />
+          <PersonRow key={m.id} member={m} isMe={m.id === meId} onInvite={() => inviteMember(m.id)} />
         ))}
         <li className="p-3">
           <form
@@ -303,7 +308,7 @@ export default function SettingsTab() {
   )
 }
 
-function PersonRow({ member, isMe }: { member: Member; isMe: boolean }) {
+function PersonRow({ member, isMe, onInvite }: { member: Member; isMe: boolean; onInvite: () => void }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(member.name)
 
@@ -343,11 +348,21 @@ function PersonRow({ member, isMe }: { member: Member; isMe: boolean }) {
           aria-label={`Rename ${member.name}`}
         />
       ) : (
-        <span className={archived ? "min-w-0 flex-1 truncate text-muted-foreground" : "min-w-0 flex-1 truncate font-medium"}>
-          {member.name}
-          {isMe && <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">You</span>}
-          {archived && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs">Moved out</span>}
+        <span className="min-w-0 flex-1">
+          <span className={archived ? "block truncate text-muted-foreground" : "block truncate font-medium"}>
+            {member.name}
+            {isMe && <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">You</span>}
+            {archived && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs">Moved out</span>}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {member.userId ? (member.email ?? "Joined") : member.email ? `Invited · ${member.email}` : isMe ? "Only on this phone" : "Not joined yet"}
+          </span>
         </span>
+      )}
+      {!editing && !member.userId && !isMe && !archived && (
+        <Button variant="ghost" size="icon" className="size-11 text-primary" onClick={onInvite} aria-label={`Invite ${member.name}`}>
+          <Send className="size-4" />
+        </Button>
       )}
       <Button variant="ghost" size="icon" className="size-11 text-muted-foreground" onClick={() => setEditing(true)} aria-label={`Rename ${member.name}`}>
         <Pencil className="size-4" />
@@ -520,23 +535,24 @@ function SyncRow() {
 
 function AccountRow() {
   const session = useSession()
+  const [, navigate] = useLocation()
   if (!SYNC_BUILD_ENABLED || !hasServer()) return null
-
-  const signOut = async () => {
-    await endSession()
-    toast("Signed out", { description: "Everything stays on this phone. Sign in again to sync." })
-  }
+  const user = session?.user
 
   return (
     <div className="flex items-center gap-3">
-      <UserRound className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      {user ? (
+        <MemberAvatar id={user.id} name={displayName(user)} photo={user.avatar ?? null} className="size-8 text-[11px]" />
+      ) : (
+        <UserRound className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">Account</p>
-        <p className="truncate text-xs text-muted-foreground">{session ? session.user.email : "Not signed in"}</p>
+        <p className="truncate text-sm font-medium">{user ? displayName(user) : "Account"}</p>
+        <p className="truncate text-xs text-muted-foreground">{user ? user.email : "Not signed in"}</p>
       </div>
       {session ? (
-        <Button variant="outline" className="h-10" onClick={signOut}>
-          <LogOut /> Sign out
+        <Button variant="outline" className="h-10" onClick={() => navigate("~/profile")}>
+          <UserRound /> Profile
         </Button>
       ) : (
         <Button className="h-10" onClick={() => openSignIn()}>
@@ -668,6 +684,7 @@ function UpdateRow() {
           <Switch checked={prefs.autoUpdate} onCheckedChange={(v) => setPref("autoUpdate", v)} aria-label="Download updates automatically" />
         </label>
       )}
+      <MadeBy className="pt-1" />
     </div>
   )
 }
