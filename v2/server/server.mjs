@@ -49,6 +49,8 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8",
   ".apk": "application/vnd.android.package-archive",
   ".zip": "application/zip",
+  // Azan recordings for the website (/adhan/*.ogg)
+  ".ogg": "audio/ogg",
 }
 
 /** Trip storage: { seq, users: [userId], records: { "table:id": { table, seq, updatedAt, data } } } */
@@ -423,6 +425,23 @@ export function createServer({
             "Content-Type": "image/jpeg",
             "Content-Length": info.size,
             "Cache-Control": "private, max-age=31536000, immutable",
+          })
+          return createReadStream(filePath).pipe(res)
+        }
+        // Azan recordings the app uses by default (DATA_DIR/adhan/azan.mp3, fajr.mp3). Not public:
+        // only people in at least one group, so they're shared within homes, not published.
+        const adhanMatch = pathname.match(/^\/api\/adhan\/(azan|fajr)$/)
+        if (adhanMatch && req.method === "GET") {
+          if ((await auth.groupsOf(user.id)).length === 0) throw new HttpError(403, "Join a home first")
+          const filePath = path.join(dir, "adhan", `${adhanMatch[1]}.mp3`)
+          const info = await stat(filePath).catch(() => null)
+          if (!info) throw new HttpError(404, "No recording on this server")
+          res.writeHead(200, {
+            "Content-Type": "audio/mpeg",
+            "Content-Length": info.size,
+            // Changes only if someone replaces the file: the app keeps its copy anyway
+            "Cache-Control": "private, max-age=86400",
+            ETag: `"${info.size}-${Math.round(info.mtimeMs)}"`,
           })
           return createReadStream(filePath).pipe(res)
         }

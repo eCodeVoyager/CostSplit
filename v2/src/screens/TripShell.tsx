@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, HandCoins, House, LayoutGrid, Plus, Receipt, Wallet } from "lucide-react"
+import { Bell, ChevronLeft, HandCoins, House, LayoutGrid, MoonStar, Plus, Receipt, Wallet } from "lucide-react"
 import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { Link, Route, Switch, useLocation, useSearch } from "wouter"
 import { AddSheet } from "@/components/AddSheet"
@@ -35,6 +35,7 @@ const SettingsTab = lazy(() => import("./SettingsTab"))
 const BillsScreen = lazy(() => import("./BillsScreen"))
 const MealsScreen = lazy(() => import("./MealsScreen"))
 const ShoppingScreen = lazy(() => import("./ShoppingScreen"))
+const PrayerScreen = lazy(() => import("./PrayerScreen"))
 const ShareDialog = lazy(() => import("@/components/ShareDialog").then((m) => ({ default: m.ShareDialog })))
 
 type Sheet =
@@ -140,7 +141,6 @@ export function TripShell({ id }: { id: string }) {
               </h1>
               <SyncBadge pending={data.pending} />
               <InboxButton onInvite={actions.invite} />
-              <MoreButton />
             </div>
           </header>
 
@@ -157,6 +157,7 @@ export function TripShell({ id }: { id: string }) {
                 <Route path="/list" component={ShoppingScreen} />
                 <Route path="/stats" component={StatsTab} />
                 <Route path="/settings" component={SettingsTab} />
+                <Route path="/prayer">{() => <PrayerScreen />}</Route>
               </Switch>
             </Suspense>
           </main>
@@ -252,32 +253,32 @@ function InboxButton({ onInvite }: { onInvite: () => void }) {
   )
 }
 
-/** Bills, meals, list, insights and settings live behind this (the tab bar holds Personal instead) */
-function MoreButton() {
-  const [location] = useLocation()
-  const active = SUB_PAGES.includes(location)
-  return (
-    <Button variant="ghost" size="icon" className={cn("size-11", active && "text-primary")} asChild>
-      <Link href="/more" aria-label="More: bills, meals, list, insights, settings" aria-current={active ? "page" : undefined}>
-        <LayoutGrid className="size-5" strokeWidth={active ? 2.4 : 2} />
-      </Link>
-    </Button>
-  )
-}
-
+/**
+ * Three tabs, the + button, three tabs: + sits exactly in the middle. More
+ * (bills, meals, list, insights, settings) lives here too, so the header has
+ * room for the group's name.
+ */
 function BottomNav({ onAdd, onAddPersonal, home }: { onAdd: () => void; onAddPersonal: () => void; home: boolean }) {
   const [location] = useLocation()
   const onPersonal = location === "/personal"
   const tabs = [
-    { href: "/", label: home ? "Home" : "Overview", icon: House, active: location === "/" },
+    { href: "/", label: home ? "Home" : "Trip", icon: House, active: location === "/" },
     { href: "/activity", label: "Activity", icon: Receipt, active: location === "/activity" },
-    null,
     { href: "/balances", label: "Balances", icon: HandCoins, active: location === "/balances" },
+    null,
     { href: "/personal", label: "Personal", icon: Wallet, active: onPersonal },
+    { href: "/prayer", label: "Prayer", icon: MoonStar, active: location === "/prayer" },
+    {
+      href: "/more",
+      label: "More",
+      icon: LayoutGrid,
+      active: SUB_PAGES.includes(location),
+      aria: "More: bills, meals, list, insights, settings",
+    },
   ]
   return (
     <nav aria-label="Sections" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 backdrop-blur-md">
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center">
+      <div className="mx-auto grid h-16 max-w-lg grid-cols-7 items-center">
         {tabs.map((tab) =>
           tab === null ? (
             <div key="add" className="flex justify-center">
@@ -286,9 +287,9 @@ function BottomNav({ onAdd, onAddPersonal, home }: { onAdd: () => void; onAddPer
                 // On Personal, + adds a personal expense straight away
                 onClick={onPersonal ? onAddPersonal : onAdd}
                 aria-label={onPersonal ? "Add personal expense" : "Add"}
-                className="-mt-7 inline-flex size-15 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform active:scale-95"
+                className="-mt-5 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-[3px] ring-background transition-transform active:scale-95"
               >
-                <Plus className="size-7" strokeWidth={2.5} />
+                <Plus className="size-6" strokeWidth={2.5} />
               </button>
             </div>
           ) : (
@@ -296,13 +297,14 @@ function BottomNav({ onAdd, onAddPersonal, home }: { onAdd: () => void; onAddPer
               key={tab.href}
               href={tab.href}
               aria-current={tab.active ? "page" : undefined}
+              aria-label={"aria" in tab ? tab.aria : undefined}
               className={cn(
-                "flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
+                "flex h-full min-w-0 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
                 tab.active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <tab.icon className="size-[22px]" strokeWidth={tab.active ? 2.4 : 2} aria-hidden />
-              {tab.label}
+              <tab.icon className="size-5 shrink-0" strokeWidth={tab.active ? 2.4 : 2} aria-hidden />
+              <span className="max-w-full truncate">{tab.label}</span>
             </Link>
           )
         )}

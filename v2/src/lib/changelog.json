@@ -1,4 +1,45 @@
 {
+  "2.4.4": {
+    "title": "Balanced tab bar",
+    "notes": [
+      "The + button is back in the middle: Home, Activity, Balances on the left; Personal, Prayer, More on the right.",
+      "More (bills, meals, list, insights, settings) moved from the top bar to the tab bar, so long home names fit at the top."
+    ]
+  },
+  "2.4.3": {
+    "title": "Sweeter azan voices",
+    "notes": [
+      "The azan is now Omar Hisham Al Arabi, and Fajr is Mishary Rashid Alafasy (with “As-salatu khayrun min an-nawm”). Silence trimmed, volume levelled.",
+      "They download to your phone once when you are signed in (about 9 MB), then play offline. Until then the built-in azan plays.",
+      "Prefer another? Built-in or your own file are one tap away in the Prayer tab under Sound."
+    ]
+  },
+  "2.4.2": {
+    "title": "Your own azan, cleaned up",
+    "notes": [
+      "Pick your favourite azan recording in the Prayer tab (one for Fajr, one for the rest): silence at the start and end is cut, long gaps shortened and the volume raised automatically.",
+      "The tab bar fits the + button again, and messages show at the top."
+    ]
+  },
+  "2.4.1": {
+    "title": "Tidier tab bar",
+    "notes": [
+      "The + button fits the tab bar again now that Prayer has its own tab, on small phones too.",
+      "Messages like “Saved” or “Azan is on” now show at the top, under the header, instead of over the tab bar."
+    ]
+  },
+  "2.4.0": {
+    "title": "Azan five times a day",
+    "notes": [
+      "New Prayer tab: today's prayer times, the next prayer with a countdown, and the Hijri date. Sehri and Iftar times in Ramadan.",
+      "Auto azan, on by default: plays at Fajr, Dhuhr, Asr, Maghrib and Isha by itself, with the app closed and the screen off. Jumu'ah on Fridays.",
+      "Fajr plays its own azan, with “As-salatu khayrun min an-nawm”.",
+      "Plays loud through the alarm speaker (even on silent), or through your Bluetooth speaker or headphones when connected. Stop from the notification or with a volume button.",
+      "Times follow your phone's time zone, or pick your city (all of Bangladesh's big towns) or use your location. Method and Asr (Hanafi) are set for your country; adjust minutes to match your mosque.",
+      "Per prayer: azan, notification only, or off. Reminders before each prayer and at sunrise. Your own azan recording if you like.",
+      "“Make sure it plays” checks battery saver, notifications and your phone maker's auto-start setting, with one tap to fix each, plus a 1-minute test with the app closed."
+    ]
+  },
   "2.3.0": {
     "title": "Updates install themselves",
     "notes": [

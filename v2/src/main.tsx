@@ -2,7 +2,7 @@ import { App as NativeApp } from "@capacitor/app"
 import { createRoot } from "react-dom/client"
 import { navigate } from "wouter/use-browser-location"
 import App from "./App"
-import { LAST_TRIP_KEY } from "./lib/nav"
+import { LAST_TRIP_KEY, prayerPath } from "./lib/nav"
 import { isNative } from "./lib/server"
 import { startSync } from "./lib/sync"
 import { applyTheme } from "./lib/theme"
@@ -43,6 +43,8 @@ else {
       const as = searchParams.get("as")
       const query = as && /^[A-Za-z0-9_-]{8,64}$/.test(as) ? `?as=${as}` : ""
       if (/^\/(join|t)\/[A-Za-z0-9_-]+$/.test(pathname)) navigate(pathname + query)
+      // Azan notifications open the Prayer tab
+      else if (pathname === "/prayer") navigate(prayerPath())
     } catch {
       // Not a URL we handle
     }

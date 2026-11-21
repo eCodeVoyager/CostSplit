@@ -29,6 +29,30 @@ Also: edit anything, undo on delete, several payers ("Rest" fills what's left), 
 
 Trips use the same app with travel defaults (EUR, food/taxi/ferry chips, no bills or meals).
 
+## Azan (Prayer tab)
+
+The **Prayer** tab (tab bar in every group, or `/prayer` from the first screen) shows today's prayer times, the next prayer with a countdown, the Hijri date and Sehri/Iftar in Ramadan. **Auto azan is on by default**: the Android app plays the azan at Fajr, Dhuhr, Asr, Maghrib and Isha by itself, with the app closed and the screen off. Fajr always plays its own recording (with *as-salatu khayrun min an-nawm*); the others play the regular azan. The website plays it only while a tab is open.
+
+| Setting | Options |
+|---|---|
+| Per prayer | Azan / notification only / off (tap the icon in the list), minute adjustment ±30 |
+| Location | Phone's time zone (default; follows travel), a city (Bangladesh's big towns + one per time zone), or GPS once |
+| Calculation | Auto by country (Bangladesh → Karachi 18°/18° + Hanafi Asr) or any of 12 methods; high-latitude rule above 45° |
+| Sound | Plays through: Auto (Bluetooth if connected, else loud alarm speaker) / alarm speaker (plays on silent + DND) / media (Bluetooth); volume while playing (restored after); extra loud (LoudnessEnhancer); fade in; volume button stops it; your own recording for the azan and for Fajr |
+| Reminders | X minutes before each prayer, sunrise |
+
+How it plays on Android, reliably:
+
+- **Times** come from the sun's position on the phone: `src/lib/adhan/calc.ts` and its line-by-line Java port `AdhanCalc.java` (checked to the millisecond by `android/app/src/test/.../AdhanCalcTest.java`; run `node scripts/gradle.mjs testDebugUnitTest`). Within ±1 minute of the `adhan` reference library.
+- **The app hands its settings to the phone** (`AdhanPlugin.configure`, again on every start and resume). Places arrive already resolved, including every time zone's city, so `AdhanScheduler` works with the app closed.
+- **One alarm at a time**: `AlarmManager.setAlarmClock` for the next event (exact, delivered in Doze, allowed to start a foreground service from the background; `USE_EXACT_ALARM` means no permission screen on Android 13+). When it fires, `AdhanReceiver` plays/notifies and sets the next one. Boot, app update, clock and time zone changes re-plan. An alarm more than 10 minutes late (phone was off) is skipped rather than played at the wrong time.
+- **`AdhanService`** (foreground service, type `mediaPlayback`) plays the recording, raises the stream volume and restores it, takes audio focus (pauses music), never plays during a call, and stops on Stop / swipe / volume key / call. If Android refuses the service, a normal notification with sound goes out instead.
+- **"Make sure it plays"** in the tab checks notifications, exact alarms, battery optimisation (one-tap system dialog via `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) and opens the phone maker's auto-start screen (Xiaomi, Oppo/Realme, Vivo, Huawei/Honor, Tecno/Infinix, OnePlus, Samsung...). **Test with the app closed** schedules a real azan one minute later.
+
+**Default voices (home's voices):** Omar Hisham Al Arabi (azan) and Mishary Rashid Alafasy (Fajr). They are **not** in the repo, the APK or the public website: they live on the server in `DATA_DIR/adhan/azan.mp3` and `fajr.mp3` and `GET /api/adhan/azan|fajr` gives them only to signed-in accounts that belong to a group. The app downloads them once into its file slots (`ensureVoices`, `src/lib/adhan/voices.ts`) and plays them offline from then on; signed out or offline, the built-in recordings below play instead (Fajr always falls back to the built-in *Fajr* azan). To change them, replace the two files on the server (`scp new.mp3 s3:/opt/costsplit/data/adhan/azan.mp3`); phones that already downloaded keep their copy until someone taps the voice again. "Your own file" (any MP3/M4A/OGG) is cleaned up on the phone before saving: silence at the start and end cut, gaps over 4 s shortened, volume raised (`src/lib/adhan/trim.ts`).
+
+Built-in recordings are in `android/app/src/main/res/raw` (the website gets the same files at `/adhan/*.ogg`, see `vite.config.ts`): regular azan by Adam-synagda (Wikimedia Commons, CC0); Fajr azan by Sheikh Hamed, Masgid Mahmoudeya, Cairo, from *Voices and Faces of the Adhan* by Anna Kipervaser, On Look Films (University of Cambridge repository, **CC BY-NC-ND 3.0**: fine for this free app with the credit shown in the tab; swap it if CostSplit ever becomes commercial). The Fajr file is only converted to Ogg, not edited; the app skips its first 7 s of street sound and stops at 3:10 at playback time.
+
 ## What changed from v1
 
 | | v1 | v2 |

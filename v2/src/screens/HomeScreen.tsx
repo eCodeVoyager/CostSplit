@@ -2,6 +2,7 @@ import { Bell, ChevronRight, CloudOff, HandCoins, Link2, ListChecks, Plus, Share
 import { useState } from "react"
 import { useLocation } from "wouter"
 import { BalanceText, MadeBy, MemberAvatar } from "@/components/common"
+import { NextPrayerCard } from "@/components/NextPrayerCard"
 import { openSignIn } from "@/components/SignInSheet"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -71,6 +72,7 @@ export function HomeScreen() {
             </button>
           )}
           <Dashboard groups={trips} open={(url) => navigate(url)} />
+          <NextPrayerCard className="mt-3" />
           <h2 className="px-1 pt-5 pb-2 text-sm font-semibold text-muted-foreground">Your homes and trips</h2>
           <ul className="space-y-3">
             {trips.map(({ trip, people, count, me, unread, billStatus }) => (
@@ -158,6 +160,7 @@ function Welcome({ onNew, onJoin, signedOut }: { onNew: () => void; onJoin: () =
           </Button>
         )}
       </div>
+      <NextPrayerCard className="mt-6" />
       <InstallCard />
     </div>
   )

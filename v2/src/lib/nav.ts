@@ -9,6 +9,22 @@ export function rememberTrip(tripId: string | null) {
   }
 }
 
+/**
+ * The Prayer tab: inside the home or trip you're in (or were last in), so the
+ * tab bar stays; the standalone page when there's no group yet.
+ */
+export function prayerPath(pathname = window.location.pathname) {
+  const inTrip = pathname.match(/^\/t\/([A-Za-z0-9_-]{8,64})/)?.[1]
+  if (inTrip) return `/t/${inTrip}/prayer`
+  try {
+    const last = localStorage.getItem(LAST_TRIP_KEY)
+    if (last) return `/t/${last}/prayer`
+  } catch {
+    // Storage blocked
+  }
+  return "/prayer"
+}
+
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
 
 export function isTripId(value: string) {

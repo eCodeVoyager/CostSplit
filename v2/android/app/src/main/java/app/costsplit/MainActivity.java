@@ -12,6 +12,8 @@ public class MainActivity extends BridgeActivity {
         LiveUpdates.beforeStart(getApplicationContext());
         // App-only plugins must be registered before the bridge starts
         registerPlugin(ApkUpdaterPlugin.class);
+        // Azan five times a day (Prayer tab)
+        registerPlugin(AdhanPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

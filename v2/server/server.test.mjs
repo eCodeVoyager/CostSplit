@@ -272,6 +272,22 @@ describe("sync server", () => {
     assert.equal((await fetch(`${base}/api/avatars/${second.user.avatar}`, { headers: { Authorization: `Bearer ${other}` } })).status, 404)
   })
 
+  it("serves the default azan recordings to group members only", async () => {
+    const get = (name, token) => fetch(`${base}/api/adhan/${name}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    assert.equal((await get("azan", alice)).status, 404, "nothing uploaded yet")
+    await mkdir(path.join(dataDir, "adhan"), { recursive: true })
+    await writeFile(path.join(dataDir, "adhan", "azan.mp3"), Buffer.from("ID3 azan"))
+    const ok = await get("azan", alice)
+    assert.equal(ok.status, 200)
+    assert.equal(ok.headers.get("content-type"), "audio/mpeg")
+    assert.equal(Buffer.from(await ok.arrayBuffer()).toString(), "ID3 azan")
+    assert.equal((await get("azan")).status, 401)
+    const loner = await signIn("loner@example.com")
+    assert.equal((await get("azan", loner)).status, 403, "signed in but in no group")
+    assert.equal((await get("../_auth.json", alice)).status, 404)
+    assert.equal((await get("fajr", alice)).status, 404)
+  })
+
   it("emails personal invite links for members of the group only", async () => {
     await sync({ tripId: TRIP, changes: [{ table: "members", record: member("member-carol", { name: "Carol <b>", updatedAt: 6000 }) }] })
     const invite = (body, token = alice) => call("/api/invite", { body: { tripId: TRIP, memberId: "member-carol", email: "Carol@Example.com", ...body }, token })
