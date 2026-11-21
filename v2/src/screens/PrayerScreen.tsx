@@ -525,30 +525,39 @@ function SoundSettings({ settings, status, refresh }: { settings: AdhanSettings;
     <>
       <SectionTitle>Sound</SectionTitle>
       <div className="space-y-4 rounded-2xl border bg-card p-4">
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Plays through</span>
-          <Segmented<Output>
-            label="Plays through"
-            value={settings.output}
-            onChange={(output) => updateAdhanSettings({ output })}
-            options={[
-              { value: "auto", label: "Auto" },
-              { value: "alarm", label: "Loud speaker" },
-              { value: "media", label: "Bluetooth" },
-            ]}
-          />
-          <p className="text-xs text-muted-foreground">
-            {OUTPUT_TEXT[settings.output]}
-            {isNative && status?.bluetooth ? " Bluetooth is connected now." : ""}
-          </p>
-        </div>
+        {/* Speaker / Bluetooth routing is the Android app's; a browser plays wherever its sound goes */}
+        {isNative && (
+          <div className="space-y-2">
+            <span className="text-sm font-medium">Plays through</span>
+            <Segmented<Output>
+              label="Plays through"
+              value={settings.output}
+              onChange={(output) => updateAdhanSettings({ output })}
+              options={[
+                { value: "auto", label: "Auto" },
+                { value: "alarm", label: "Loud speaker" },
+                { value: "media", label: "Bluetooth" },
+              ]}
+            />
+            <p className="text-xs text-muted-foreground">
+              {OUTPUT_TEXT[settings.output]}
+              {status?.bluetooth ? " Bluetooth is connected now." : ""}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="adhan-volume-on" className="min-w-0">
               <span className="block text-sm font-medium">Set volume for the azan</span>
               <span className="block text-xs text-muted-foreground">
-                {settings.volume > 0 ? `${settings.volume}% while it plays, then back to yours` : "Uses the phone's volume as it is"}
+                {!isNative
+                  ? settings.volume > 0
+                    ? `${settings.volume}% of the browser's volume`
+                    : "Full browser volume"
+                  : settings.volume > 0
+                    ? `${settings.volume}% while it plays, then back to yours`
+                    : "Uses the phone's volume as it is"}
               </span>
             </label>
             <Switch

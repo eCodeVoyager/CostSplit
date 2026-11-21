@@ -31,7 +31,7 @@ Trips use the same app with travel defaults (EUR, food/taxi/ferry chips, no bill
 
 ## Azan (Prayer tab)
 
-The **Prayer** tab (tab bar in every group, or `/prayer` from the first screen) shows today's prayer times, the next prayer with a countdown, the Hijri date and Sehri/Iftar in Ramadan. **Auto azan is on by default**: the Android app plays the azan at Fajr, Dhuhr, Asr, Maghrib and Isha by itself, with the app closed and the screen off. Fajr always plays its own recording (with *as-salatu khayrun min an-nawm*); the others play the regular azan. The website plays it only while a tab is open.
+The **Prayer** tab (tab bar in every group, or `/prayer` from the first screen) shows today's prayer times, the next prayer with a countdown, the Hijri date and Sehri/Iftar in Ramadan. **Auto azan is on by default**: the Android app plays the azan at Fajr, Dhuhr, Asr, Maghrib and Isha by itself, with the app closed and the screen off. Fajr always plays its own recording (with *as-salatu khayrun min an-nawm*); the others play the regular azan. The website plays it only while a tab is open, also offline: the built-in recordings are in the service worker's precache (`adhan/*.ogg`, ~2.5 MB) and the home's voices are kept in Cache Storage (`costsplit-adhan-voices`) after the first download.
 
 | Setting | Options |
 |---|---|

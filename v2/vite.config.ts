@@ -63,7 +63,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+        // adhan/*.ogg: the built-in azan recordings, so the website plays the azan offline too (~2.5 MB)
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}", "adhan/*.ogg"],
         navigateFallback: "/index.html",
         // /download is its own static page, not part of the app
         navigateFallbackDenylist: [/^\/api\//, /^\/download/],

@@ -62,14 +62,43 @@ export async function restoreHomeVoice(slot: Slot, status: AdhanStatus | null) {
   return ensureVoices(status ? { ...status, [slot === "custom" ? "customSound" : "customFajrSound"]: false } : status)
 }
 
-/** Website: the home's voice as a playable URL (kept for the visit), or null for the built-in one */
+// Website: the home's voices are kept in the browser after the first download
+// (Cache Storage, not the service worker's precache), so they play offline too
+const VOICE_CACHE = "costsplit-adhan-voices"
+const cacheKey = (slot: Slot) => `/voices/${VOICES[slot].remote}.mp3`
+
+async function cachedVoice(slot: Slot): Promise<Blob | null> {
+  try {
+    const hit = await (await caches.open(VOICE_CACHE)).match(cacheKey(slot))
+    return hit ? await hit.blob() : null
+  } catch {
+    // No Cache Storage (private mode, old browser): download each visit
+    return null
+  }
+}
+
+async function keepVoice(slot: Slot, blob: Blob) {
+  try {
+    await (await caches.open(VOICE_CACHE)).put(cacheKey(slot), new Response(blob, { headers: { "Content-Type": "audio/mpeg" } }))
+  } catch {
+    // Not kept: fine, it's downloaded again next visit
+  }
+}
+
+/** Website: the home's voice as a playable URL (offline once downloaded), or null for the built-in one */
 const webUrls = new Map<Slot, Promise<string | null>>()
 export function webVoiceUrl(slot: Slot): Promise<string | null> {
-  if (isNative || !canFetch()) return Promise.resolve(null)
+  if (isNative) return Promise.resolve(null)
   let p = webUrls.get(slot)
   if (!p) {
-    p = fetchVoice(slot)
-      .then((b) => (b ? URL.createObjectURL(b) : null))
+    p = (async () => {
+      let blob = await cachedVoice(slot)
+      if (!blob && canFetch()) {
+        blob = await fetchVoice(slot).catch(() => null)
+        if (blob) await keepVoice(slot, blob)
+      }
+      return blob ? URL.createObjectURL(blob) : null
+    })()
       .catch(() => null)
       .then((url) => {
         if (!url) webUrls.delete(slot)

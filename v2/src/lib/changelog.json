@@ -1,4 +1,11 @@
 {
+  "2.4.5": {
+    "title": "Azan on the website, offline too",
+    "notes": [
+      "On the website the azan now plays with no internet as well: the recordings are saved with the site, and Omar Hisham and Mishary Alafasy stay saved after the first time.",
+      "The website no longer shows the Android-only speaker and Bluetooth choice."
+    ]
+  },
   "2.4.4": {
     "title": "Balanced tab bar",
     "notes": [

@@ -6,7 +6,7 @@ import { SALAH } from "@/lib/adhan/calc"
 import { configureNative } from "@/lib/adhan/native"
 import { getAdhanSettings, nativeConfig, prayerName, resolvePlace, timesOn, useAdhanSettings, type AdhanSettings } from "@/lib/adhan/settings"
 import { ensureVoices, webVoiceUrl } from "@/lib/adhan/voices"
-import { playWeb } from "@/lib/adhan/web"
+import { playWeb, warmUpWeb } from "@/lib/adhan/web"
 import { useSession } from "@/lib/auth"
 import { prayerPath } from "@/lib/nav"
 import { notifyPermission, requestNotifyPermission, showNow } from "@/lib/notify"
@@ -83,6 +83,14 @@ export function AdhanHost() {
     }
     return scheduleWeb(settings)
   }, [settings, navigate])
+
+  // Website: have the recordings in hand (and kept for offline) before the first prayer time
+  useEffect(() => {
+    if (isNative || !settings.enabled) return
+    warmUpWeb()
+    if (settings.sound === "custom") webVoiceUrl("custom").catch(() => {})
+    if (settings.fajrSound === "custom_fajr") webVoiceUrl("custom_fajr").catch(() => {})
+  }, [settings.enabled, settings.sound, settings.fajrSound, session])
 
   return null
 }
